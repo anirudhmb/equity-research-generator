@@ -13,14 +13,17 @@
 | Phase | Status | Completion | Notes |
 |-------|--------|------------|-------|
 | **Phase 1: Setup & Environment** | ✅ Complete | 100% (3/3) | Environment ✅, Config ✅, Testing ✅ |
-| **Phase 2: Data Collection Tools** | ✅ Complete | 100% (4/4) | Data ✅, Ratios ✅, Market ✅, News ✅ |
-| **Phase 3: Agent Development** | ⏳ Pending | 0% | - |
-| **Phase 4: LangGraph Orchestration** | ⏳ Pending | 0% | - |
-| **Phase 5: Report Generation** | ⏳ Pending | 0% | - |
-| **Phase 6: UI Development** | ⏳ Pending | 0% | - |
-| **Phase 7: Testing & Refinement** | ⏳ Pending | 0% | - |
+| **Phase 2: Tools Development** | ✅ Complete | 100% (4/4) | Data ✅, Ratios ✅, Market ✅, News ✅ |
+| **Phase 3: State & Graph Architecture** | ⏳ Pending | 0% (0/3) | LangGraph setup |
+| **Phase 4: Data Collection Node** | ⏳ Pending | 0% (0/2) | Deterministic node |
+| **Phase 5: Financial Analysis Node** | ⏳ Pending | 0% (0/2) | Deterministic node |
+| **Phase 6: Report Writing Agent Node** | ⏳ Pending | 0% (0/3) | LLM-powered node |
+| **Phase 7: Graph Compilation & Testing** | ⏳ Pending | 0% (0/3) | Integration |
+| **Phase 8: Report Generation** | ⏳ Pending | 0% | Word + Excel |
+| **Phase 9: UI Development** | ⏳ Pending | 0% | Streamlit |
+| **Phase 10: Final Testing** | ⏳ Pending | 0% | QA |
 
-**Current Focus:** Phase 3 - Agent Development (3-agent architecture)
+**Current Focus:** Phase 3 - State Definition & LangGraph Setup (Proper LangGraph architecture with shared state)
 
 ---
 
@@ -373,319 +376,1064 @@ print(nifty.history(period="5y"))
 
 ---
 
-## Phase 3: Agent 1 - Data Collection Agent (2-3 hours)
+## Phase 3: State Definition & Graph Architecture (2-3 hours)
 
-### 🤖 Step 3.1: Agent Implementation
-**Duration:** 1.5 hours
+**Purpose:** Define the shared state schema and setup LangGraph structure (LangGraph best practice: State First!)
+
+### 📋 Step 3.1: Define State Schema
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
 
 **Files to Create:**
-- `agents/data_agent.py`
+- `agents/state.py`
 
 **Implementation:**
 ```python
-class DataCollectionAgent:
-    def __init__(self, llm, tools):
-        """Initialize with LLM and data tools"""
-        
-    def collect_all_data(self, ticker):
-        """Main orchestration method"""
-        # 1. Validate ticker
-        # 2. Fetch financial statements
-        # 3. Fetch stock prices
-        # 4. Fetch company info
-        # 5. Fetch competitors
-        # 6. Fetch news
-        # 7. Validate and save
-        # 8. Return CSV paths
+from typing import TypedDict, Optional, Dict, List, Any
+import pandas as pd
+
+class EquityResearchState(TypedDict):
+    """
+    Shared state for the entire equity research workflow.
+    All nodes read from and update this state.
+    """
+    # === INPUT ===
+    ticker: str                              # Company ticker (e.g., "RELIANCE")
+    company_name: Optional[str]              # Full company name
+    
+    # === DATA COLLECTION NODE OUTPUT ===
+    company_info: Optional[Dict[str, Any]]   # Company metadata
+    stock_prices: Optional[pd.DataFrame]     # Historical prices
+    financial_statements: Optional[Dict]     # Balance sheet, income, cash flow
+    dividends: Optional[pd.DataFrame]        # Dividend history
+    market_index: Optional[pd.DataFrame]     # NIFTY 50 data
+    news: Optional[pd.DataFrame]             # News articles
+    news_categorized: Optional[Dict]         # Categorized news
+    news_timeline: Optional[Dict]            # Timeline statistics
+    data_quality_score: Optional[float]      # 0-1 quality score
+    
+    # === FINANCIAL ANALYSIS NODE OUTPUT ===
+    ratios: Optional[Dict[str, Dict]]        # 18 financial ratios
+    ratio_trends: Optional[Dict]             # Trend analysis
+    beta: Optional[float]                    # Systematic risk
+    correlation_with_market: Optional[float] # Correlation coefficient
+    cost_of_equity: Optional[float]          # CAPM result
+    ddm_valuation: Optional[Dict]            # DDM fair value
+    market_risk_premium: Optional[Dict]      # Market analysis
+    valuation_recommendation: Optional[str]  # Buy/Hold/Sell
+    
+    # === RESEARCH & WRITING NODE OUTPUT ===
+    executive_summary: Optional[str]         # High-level overview
+    company_overview_text: Optional[str]     # Company description
+    financial_analysis_text: Optional[str]   # Analysis commentary
+    ratio_commentary: Optional[Dict]         # Commentary per ratio
+    valuation_text: Optional[str]            # Valuation analysis
+    risk_analysis_text: Optional[str]        # Risk assessment
+    recent_developments_text: Optional[str]  # News synthesis
+    recommendation_text: Optional[str]       # Final recommendation
+    
+    # === METADATA ===
+    current_step: str                        # Current workflow step
+    errors: List[str]                        # Error messages
+    warnings: List[str]                      # Warning messages
+    collection_timestamp: Optional[str]      # ISO timestamp
+    processing_duration: Optional[float]     # Seconds
+    data_complete: bool                      # All critical data present?
 ```
 
-**Agent Behavior:**
-- Uses LangChain's agent framework
-- Reasons about what data to fetch
-- Handles missing data gracefully
-- Retries failed API calls
+**Key Design Principles:**
+- ✅ **One unified state** shared by all nodes
+- ✅ **TypedDict** for type safety and IDE autocomplete
+- ✅ **Optional fields** for graceful handling of missing data
+- ✅ **Organized sections** (Input → Data → Analysis → Report)
+- ✅ **Metadata tracking** for monitoring and debugging
 
 ---
 
-### 🤖 Step 3.2: Testing & Validation
-**Duration:** 1 hour
+### 🔄 Step 3.2: Create StateGraph Structure
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
 
-- [ ] Test with 3 different companies
-- [ ] Verify CSV output format
+**Files to Create:**
+- `agents/graph.py`
+
+**Implementation:**
+```python
+from langgraph.graph import StateGraph, END
+from agents.state import EquityResearchState
+from agents.nodes.data_collection import collect_data_node
+from agents.nodes.financial_analysis import analyze_node
+from agents.nodes.report_writing import write_report_node
+
+def create_research_graph():
+    """
+    Create the LangGraph workflow for equity research.
+    
+    Workflow:
+    Input (ticker) → Data Collection → Financial Analysis → Report Writing → Output
+    """
+    # Initialize graph with state schema
+    graph = StateGraph(EquityResearchState)
+    
+    # Add nodes (each node is a function that takes/returns state)
+    graph.add_node("collect_data", collect_data_node)
+    graph.add_node("analyze", analyze_node)
+    graph.add_node("write_report", write_report_node)
+    
+    # Define workflow edges
+    graph.set_entry_point("collect_data")       # Start here
+    graph.add_edge("collect_data", "analyze")   # Data → Analysis
+    graph.add_edge("analyze", "write_report")   # Analysis → Writing
+    graph.set_finish_point("write_report")      # End here
+    
+    # Compile the graph
+    app = graph.compile()
+    
+    return app
+
+# Usage:
+# app = create_research_graph()
+# result = app.invoke({"ticker": "RELIANCE", "company_name": "Reliance Industries"})
+```
+
+**Graph Visualization:**
+```
+┌──────────────────────────────────────────────────────────┐
+│                   EquityResearchState                    │
+│                  (Shared State Object)                   │
+└──────────────────────────────────────────────────────────┘
+                          ↓
+              ┌───────────────────────┐
+              │   START (Input)       │
+              │   ticker, company     │
+              └───────────────────────┘
+                          ↓
+              ┌───────────────────────┐
+              │  collect_data_node    │
+              │  (Deterministic)      │
+              │  - Fetches all data   │
+              │  - Updates state      │
+              └───────────────────────┘
+                          ↓
+              ┌───────────────────────┐
+              │   analyze_node        │
+              │   (Deterministic)     │
+              │   - Calculates ratios │
+              │   - Beta/CAPM/DDM     │
+              │   - Updates state     │
+              └───────────────────────┘
+                          ↓
+              ┌───────────────────────┐
+              │ write_report_node     │
+              │ (LLM-Powered Agent)   │
+              │ - Synthesizes insights│
+              │ - Generates text      │
+              │ - Updates state       │
+              └───────────────────────┘
+                          ↓
+              ┌───────────────────────┐
+              │   END (Output)        │
+              │   Complete state with │
+              │   data + analysis +   │
+              │   report text         │
+              └───────────────────────┘
+```
+
+---
+
+### ⚙️ Step 3.3: Setup Configuration & LLM
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Files to Update:**
+- `agents/graph.py`
+
+**Implementation:**
+```python
+from config.settings import LLM_PROVIDER, GROQ_API_KEY, GEMINI_API_KEY
+from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+def get_llm():
+    """Get configured LLM based on environment settings."""
+    if LLM_PROVIDER == "groq" and GROQ_API_KEY:
+        return ChatGroq(
+            model="llama-3.1-70b-versatile",
+            temperature=0.7,
+            api_key=GROQ_API_KEY
+        )
+    elif LLM_PROVIDER == "gemini" and GEMINI_API_KEY:
+        return ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            temperature=0.7,
+            api_key=GEMINI_API_KEY
+        )
+    else:
+        raise ValueError("No valid LLM configured. Set GROQ_API_KEY or GEMINI_API_KEY")
+
+# Add to graph creation
+def create_research_graph():
+    llm = get_llm()
+    # ... rest of graph setup
+```
+
+**Deliverables:**
+- ✅ State schema defined (`agents/state.py`)
+- ✅ StateGraph created (`agents/graph.py`)
+- ✅ LLM configuration working
+- ✅ Graph can be compiled (nodes are placeholders for now)
+
+---
+
+## Phase 4: Data Collection Node (1-2 hours)
+
+**Purpose:** Implement deterministic data collection node (no LLM reasoning needed)
+
+### 📊 Step 4.1: Implement Data Collection Node
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
+
+**Files to Create:**
+- `agents/nodes/__init__.py`
+- `agents/nodes/data_collection.py`
+
+**Implementation:**
+```python
+from agents.state import EquityResearchState
+from utils.logger import logger
+from tools.data_tools import (
+    fetch_company_info,
+    fetch_stock_prices,
+    fetch_financial_statements,
+    fetch_dividends,
+    fetch_market_index
+)
+from tools.news_scraper import fetch_all_news, categorize_news, get_news_timeline
+from config.settings import NSE_SUFFIX, NIFTY_INDEX, YEARS_OF_DATA, MONTHS_OF_NEWS
+
+def collect_data_node(state: EquityResearchState) -> dict:
+    """
+    Data Collection Node - Deterministic workflow.
+    
+    Fetches all required data and updates state.
+    No LLM reasoning needed - fixed workflow.
+    
+    Args:
+        state: Current EquityResearchState
+        
+    Returns:
+        dict: State updates to merge into shared state
+    """
+    logger.info(f"🚀 Starting data collection for {state['ticker']}")
+    
+    ticker = state['ticker']
+    ticker_symbol = f"{ticker}{NSE_SUFFIX}"
+    company_name = state.get('company_name', ticker)
+    
+    updates = {
+        'current_step': 'data_collection',
+        'errors': state.get('errors', []),
+        'warnings': state.get('warnings', [])
+    }
+    
+    # 1. Company Info
+    try:
+        company_info = fetch_company_info(ticker_symbol)
+        updates['company_info'] = company_info
+        if company_info and 'longName' in company_info:
+            updates['company_name'] = company_info['longName']
+    except Exception as e:
+        updates['errors'].append(f"Company info: {str(e)}")
+    
+    # 2. Stock Prices
+    try:
+        prices_data = fetch_stock_prices(ticker_symbol, years=YEARS_OF_DATA)
+        updates['stock_prices'] = prices_data['prices']
+    except Exception as e:
+        updates['errors'].append(f"Stock prices: {str(e)}")
+    
+    # 3. Financial Statements
+    try:
+        statements = fetch_financial_statements(ticker_symbol, years=YEARS_OF_DATA)
+        updates['financial_statements'] = statements
+    except Exception as e:
+        updates['errors'].append(f"Financial statements: {str(e)}")
+    
+    # 4. Dividends
+    try:
+        dividends_data = fetch_dividends(ticker_symbol)
+        updates['dividends'] = dividends_data['dividends'] if dividends_data else None
+    except Exception as e:
+        updates['warnings'].append(f"Dividends: {str(e)}")
+    
+    # 5. Market Index
+    try:
+        index_data = fetch_market_index(NIFTY_INDEX, years=YEARS_OF_DATA)
+        updates['market_index'] = index_data['prices']
+    except Exception as e:
+        updates['errors'].append(f"Market index: {str(e)}")
+    
+    # 6. News
+    try:
+        news_df = fetch_all_news(company_name, ticker, months=MONTHS_OF_NEWS)
+        if not news_df.empty:
+            updates['news'] = news_df
+            updates['news_categorized'] = categorize_news(news_df)
+            updates['news_timeline'] = get_news_timeline(news_df)
+    except Exception as e:
+        updates['warnings'].append(f"News: {str(e)}")
+    
+    # 7. Calculate data quality score
+    quality_score = _calculate_data_quality(updates)
+    updates['data_quality_score'] = quality_score
+    updates['data_complete'] = quality_score >= 0.8
+    
+    logger.success(f"✅ Data collection complete (Quality: {quality_score:.1%})")
+    
+    return updates
+
+
+def _calculate_data_quality(data: dict) -> float:
+    """Calculate data quality score 0-1."""
+    score = 0.0
+    max_score = 4.0  # 4 critical data points
+    
+    if data.get('company_info'):
+        score += 1.0
+    if data.get('stock_prices') is not None:
+        score += 1.0
+    if data.get('financial_statements'):
+        score += 1.0
+    if data.get('market_index') is not None:
+        score += 1.0
+    
+    return score / max_score
+```
+
+**Node Characteristics:**
+- ✅ **Deterministic** - No LLM reasoning, fixed workflow
+- ✅ **State-based** - Takes state, returns updates
+- ✅ **Error handling** - Graceful failures, continues if possible
+- ✅ **Logging** - Clear progress indicators
+- ✅ **Quality tracking** - Data completeness score
+
+---
+
+### 🧪 Step 4.2: Test Data Collection Node
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Files to Create:**
+- `tests/test_data_collection_node.py`
+
+**Test Implementation:**
+```python
+from agents.nodes.data_collection import collect_data_node
+
+def test_data_collection_reliance():
+    """Test data collection with RELIANCE."""
+    initial_state = {
+        'ticker': 'RELIANCE',
+        'company_name': 'Reliance Industries',
+        'errors': [],
+        'warnings': []
+    }
+    
+    updates = collect_data_node(initial_state)
+    
+    # Assert critical data collected
+    assert updates['company_info'] is not None
+    assert updates['stock_prices'] is not None
+    assert updates['financial_statements'] is not None
+    assert updates['market_index'] is not None
+    assert updates['data_quality_score'] >= 0.8
+    
+    print(f"✅ RELIANCE data collection: {updates['data_quality_score']:.1%} quality")
+
+# Run tests with: pytest tests/test_data_collection_node.py -v
+```
+
+**Testing Checklist:**
+- [ ] Test with RELIANCE (dividend-paying, complete data)
+- [ ] Test with TCS (IT sector)
+- [ ] Test with INFY (large cap)
+- [ ] Test with invalid ticker (error handling)
+- [ ] Verify state updates structure
+- [ ] Check data quality scores
+
+**Deliverables:**
+- ✅ Working data collection node
+- ✅ Passing unit tests
+- ✅ Sample data collected for 3 companies
+
+---
+
+## Phase 5: Financial Analysis Node (1-2 hours)
+
+**Purpose:** Implement deterministic financial analysis node (calculations only, no LLM)
+
+### 📈 Step 5.1: Implement Financial Analysis Node
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
+
+**Files to Create:**
+- `agents/nodes/financial_analysis.py`
+
+**Implementation:**
+```python
+from agents.state import EquityResearchState
+from utils.logger import logger
+from tools.ratio_calculator import RatioCalculator
+from tools.market_tools import (
+    calculate_beta,
+    calculate_capm_cost_of_equity,
+    dividend_discount_model,
+    comprehensive_valuation_analysis
+)
+from config.settings import RISK_FREE_RATE, EXPECTED_MARKET_RETURN
+
+def analyze_node(state: EquityResearchState) -> dict:
+    """
+    Financial Analysis Node - Deterministic calculations.
+    
+    Performs all financial calculations and valuation.
+    No LLM reasoning needed - pure math.
+    
+    Args:
+        state: Current EquityResearchState with collected data
+        
+    Returns:
+        dict: State updates with analysis results
+    """
+    logger.info(f"📊 Starting financial analysis for {state['ticker']}")
+    
+    updates = {
+        'current_step': 'financial_analysis',
+        'errors': state.get('errors', []),
+        'warnings': state.get('warnings', [])
+    }
+    
+    # 1. Calculate Financial Ratios
+    try:
+        calculator = RatioCalculator(state['financial_statements'])
+        ratios = calculator.calculate_all_ratios()
+        trends = calculator.calculate_trends()
+        
+        updates['ratios'] = ratios
+        updates['ratio_trends'] = trends
+        
+        logger.success(f"✅ Calculated {len(ratios)} financial ratios")
+    except Exception as e:
+        updates['errors'].append(f"Ratio calculation: {str(e)}")
+    
+    # 2. Beta & CAPM
+    try:
+        stock_prices = state['stock_prices']
+        market_index = state['market_index']
+        
+        beta_result = calculate_beta(stock_prices, market_index)
+        updates['beta'] = beta_result['beta']
+        updates['correlation_with_market'] = beta_result['correlation']
+        
+        cost_of_equity = calculate_capm_cost_of_equity(
+            beta_result['beta'],
+            RISK_FREE_RATE,
+            EXPECTED_MARKET_RETURN
+        )
+        updates['cost_of_equity'] = cost_of_equity
+        
+        logger.success(f"✅ Beta: {beta_result['beta']:.3f}, Cost of Equity: {cost_of_equity:.2%}")
+    except Exception as e:
+        updates['errors'].append(f"Beta/CAPM: {str(e)}")
+    
+    # 3. DDM Valuation
+    try:
+        if state.get('dividends') is not None:
+            current_price = state['stock_prices']['Close'].iloc[-1]
+            
+            ddm_result = dividend_discount_model(
+                state['dividends'],
+                updates.get('cost_of_equity', 0.12),
+                current_price=current_price
+            )
+            
+            updates['ddm_valuation'] = ddm_result
+            if ddm_result.get('applicable'):
+                updates['valuation_recommendation'] = ddm_result.get('recommendation', 'Hold')
+                logger.success(f"✅ DDM Fair Value: ₹{ddm_result['fair_value']:.2f}")
+        else:
+            updates['warnings'].append("No dividends - DDM not applicable")
+    except Exception as e:
+        updates['warnings'].append(f"DDM valuation: {str(e)}")
+    
+    # 4. Comprehensive Analysis
+    try:
+        comprehensive = comprehensive_valuation_analysis(
+            state['stock_prices'],
+            state['market_index'],
+            state.get('dividends'),
+            RISK_FREE_RATE,
+            EXPECTED_MARKET_RETURN
+        )
+        updates['market_risk_premium'] = comprehensive.get('market_risk_premium')
+    except Exception as e:
+        updates['warnings'].append(f"Comprehensive analysis: {str(e)}")
+    
+    logger.success("✅ Financial analysis complete")
+    
+    return updates
+```
+
+**Node Characteristics:**
+- ✅ **Pure calculations** - No LLM needed
+- ✅ **Uses existing tools** - ratio_calculator.py, market_tools.py
+- ✅ **Comprehensive** - 18 ratios + Beta + CAPM + DDM
+- ✅ **Error resilient** - Continues even if some calculations fail
+
+---
+
+### 🧪 Step 5.2: Test Financial Analysis Node
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Test Implementation:**
+```python
+from agents.nodes.data_collection import collect_data_node
+from agents.nodes.financial_analysis import analyze_node
+
+def test_full_analysis_pipeline():
+    """Test data collection + analysis pipeline."""
+    # Step 1: Collect data
+    state = {
+        'ticker': 'RELIANCE',
+        'company_name': 'Reliance Industries',
+        'errors': [],
+        'warnings': []
+    }
+    
+    data_updates = collect_data_node(state)
+    state.update(data_updates)
+    
+    # Step 2: Analyze
+    analysis_updates = analyze_node(state)
+    state.update(analysis_updates)
+    
+    # Assert analysis completed
+    assert state['ratios'] is not None
+    assert state['beta'] is not None
+    assert state['cost_of_equity'] is not None
+    assert len(state['ratios']) >= 15
+    
+    print(f"✅ Analysis complete: {len(state['ratios'])} ratios, Beta={state['beta']:.3f}")
+
+# Run with: pytest tests/test_financial_analysis_node.py -v
+```
+
+**Deliverables:**
+- ✅ Working financial analysis node
+- ✅ All 18 ratios calculated
+- ✅ Beta, CAPM, DDM working
+- ✅ Passing tests
+
+---
+
+## Phase 6: Report Writing Agent Node (2-3 hours)
+
+**Purpose:** Implement LLM-powered report writing node (synthesis and text generation)
+
+### 🤖 Step 6.1: Create LLM Agent & Prompts
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
+
+**Files to Create:**
+- `agents/nodes/report_writing.py`
+- `agents/prompts.py`
+
+**Prompt Templates:**
+```python
+# agents/prompts.py
+
+EXECUTIVE_SUMMARY_PROMPT = """
+You are a financial analyst writing an executive summary for an equity research report.
+
+Company: {company_name}
+Sector: {sector}
+Current Price: ₹{current_price:.2f}
+Market Cap: ₹{market_cap:.2f}B
+Beta: {beta:.2f}
+
+Financial Highlights (Latest Year):
+- Revenue: ₹{revenue:.2f}Cr
+- Net Income: ₹{net_income:.2f}Cr
+- ROE: {roe:.2%}
+- Debt/Equity: {debt_equity:.2f}
+
+Valuation:
+{valuation_summary}
+
+Recent Developments:
+{recent_news}
+
+Write a concise 150-200 word executive summary highlighting:
+1. Company position in industry
+2. Financial performance snapshot
+3. Key strengths/weaknesses
+4. Valuation and recommendation
+
+Use professional, objective tone. Be data-driven.
+"""
+
+FINANCIAL_ANALYSIS_PROMPT = """
+You are a financial analyst providing commentary on financial ratios.
+
+Company: {company_name}
+
+Ratios (5-year data):
+{ratio_data}
+
+Trends:
+{trend_analysis}
+
+Industry context:
+{industry_context}
+
+Write comprehensive financial analysis commentary covering:
+1. Liquidity Analysis (Current Ratio, Quick Ratio, Cash Ratio)
+2. Efficiency Analysis (Asset Turnover, Inventory Turnover)
+3. Solvency Analysis (Debt/Equity, Interest Coverage)
+4. Profitability Analysis (Margins, ROE, ROA)
+
+For each section:
+- Interpret the ratios
+- Highlight trends (improving/deteriorating)
+- Compare to industry norms where applicable
+- Identify strengths and concerns
+
+Use professional, objective tone. Be specific with numbers.
+"""
+
+VALUATION_ANALYSIS_PROMPT = """
+You are a financial analyst writing valuation analysis.
+
+Company: {company_name}
+Current Price: ₹{current_price:.2f}
+
+Beta Analysis:
+- Beta: {beta:.2f} ({beta_interpretation})
+- Correlation with NIFTY 50: {correlation:.2f}
+- Systematic Risk: {risk_level}
+
+CAPM:
+- Cost of Equity: {cost_of_equity:.2%}
+- Risk-Free Rate: {risk_free_rate:.2%}
+- Market Return: {market_return:.2%}
+
+DDM Valuation:
+{ddm_analysis}
+
+Write valuation analysis covering:
+1. Risk Profile (Beta interpretation)
+2. Cost of Capital (CAPM breakdown)
+3. Intrinsic Value (DDM analysis)
+4. Price vs Fair Value comparison
+5. Investment recommendation with rationale
+
+Be clear, data-driven, and professional.
+"""
+```
+
+---
+
+### 🤖 Step 6.2: Implement Report Writing Node
+**Duration:** 1.5 hours  
+**Status:** ⏳ Pending
+
+**Implementation:**
+```python
+from agents.state import EquityResearchState
+from agents.prompts import (
+    EXECUTIVE_SUMMARY_PROMPT,
+    FINANCIAL_ANALYSIS_PROMPT,
+    VALUATION_ANALYSIS_PROMPT
+)
+from utils.logger import logger
+
+def write_report_node(state: EquityResearchState, llm) -> dict:
+    """
+    Report Writing Node - LLM-Powered synthesis.
+    
+    Uses LLM to synthesize insights and generate report text.
+    
+    Args:
+        state: Complete EquityResearchState with data + analysis
+        llm: Configured LLM (Groq/Gemini)
+        
+    Returns:
+        dict: State updates with report text sections
+    """
+    logger.info(f"✍️  Starting report writing for {state['company_name']}")
+    
+    updates = {
+        'current_step': 'report_writing',
+        'errors': state.get('errors', []),
+        'warnings': state.get('warnings', [])
+    }
+    
+    # 1. Executive Summary
+    try:
+        summary_prompt = _build_executive_summary_prompt(state)
+        summary = llm.invoke(summary_prompt).content
+        updates['executive_summary'] = summary
+        logger.success("✅ Executive summary generated")
+    except Exception as e:
+        updates['errors'].append(f"Executive summary: {str(e)}")
+    
+    # 2. Financial Analysis Commentary
+    try:
+        analysis_prompt = _build_financial_analysis_prompt(state)
+        analysis_text = llm.invoke(analysis_prompt).content
+        updates['financial_analysis_text'] = analysis_text
+        logger.success("✅ Financial analysis text generated")
+    except Exception as e:
+        updates['errors'].append(f"Financial analysis text: {str(e)}")
+    
+    # 3. Valuation Analysis
+    try:
+        valuation_prompt = _build_valuation_prompt(state)
+        valuation_text = llm.invoke(valuation_prompt).content
+        updates['valuation_text'] = valuation_text
+        logger.success("✅ Valuation text generated")
+    except Exception as e:
+        updates['errors'].append(f"Valuation text: {str(e)}")
+    
+    # 4. Recent Developments Synthesis
+    try:
+        if state.get('news') is not None:
+            developments_text = _synthesize_news(state, llm)
+            updates['recent_developments_text'] = developments_text
+            logger.success("✅ Recent developments synthesized")
+    except Exception as e:
+        updates['warnings'].append(f"Recent developments: {str(e)}")
+    
+    logger.success("✅ Report writing complete")
+    
+    return updates
+
+
+def _build_executive_summary_prompt(state: EquityResearchState) -> str:
+    """Build executive summary prompt with state data."""
+    # Extract relevant data from state
+    company_info = state.get('company_info', {})
+    ratios = state.get('ratios', {})
+    
+    return EXECUTIVE_SUMMARY_PROMPT.format(
+        company_name=state.get('company_name', 'Unknown'),
+        sector=company_info.get('sector', 'Unknown'),
+        current_price=state.get('stock_prices', {}).get('Close', [0])[-1] if state.get('stock_prices') else 0,
+        market_cap=company_info.get('marketCap', 0) / 1e9,
+        beta=state.get('beta', 0),
+        # ... more data extraction
+    )
+
+# Similar helper functions for other prompts...
+```
+
+---
+
+### 🧪 Step 6.3: Test Report Writing Node
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Test Implementation:**
+```python
+def test_full_pipeline_with_llm():
+    """Test complete pipeline: data → analysis → writing."""
+    from agents.graph import create_research_graph
+    
+    app = create_research_graph()
+    
+    # Run complete workflow
+    result = app.invoke({
+        'ticker': 'RELIANCE',
+        'company_name': 'Reliance Industries',
+        'errors': [],
+        'warnings': [],
+        'current_step': 'start',
+        'data_complete': False
+    })
+    
+    # Assert complete state
+    assert result['executive_summary'] is not None
+    assert result['financial_analysis_text'] is not None
+    assert result['valuation_text'] is not None
+    assert len(result['executive_summary']) > 100
+    
+    print(f"✅ Full pipeline test passed")
+    print(f"Executive Summary:\n{result['executive_summary'][:200]}...")
+
+# Run with: pytest tests/test_report_writing_node.py -v
+```
+
+**Deliverables:**
+- ✅ Working LLM-powered report writing node
+- ✅ High-quality text generation
+- ✅ All report sections completed
+- ✅ End-to-end pipeline working
+
+---
+
+## Phase 7: Graph Compilation & Integration Testing (2-3 hours)
+
+**Purpose:** Complete graph compilation, add error handling, and comprehensive testing
+
+### 🔄 Step 7.1: Complete Graph Implementation
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
+
+**Files to Update:**
+- `agents/graph.py`
+
+**Complete Implementation:**
+```python
+from langgraph.graph import StateGraph, END
+from agents.state import EquityResearchState
+from agents.nodes.data_collection import collect_data_node
+from agents.nodes.financial_analysis import analyze_node
+from agents.nodes.report_writing import write_report_node
+from agents.llm_config import get_llm
+from utils.logger import logger
+
+def create_research_graph():
+    """
+    Create complete LangGraph workflow for equity research.
+    """
+    # Get LLM
+    llm = get_llm()
+    
+    # Initialize graph
+    graph = StateGraph(EquityResearchState)
+    
+    # Add nodes
+    graph.add_node("collect_data", collect_data_node)
+    graph.add_node("analyze", analyze_node)
+    graph.add_node("write_report", lambda state: write_report_node(state, llm))
+    
+    # Define workflow
+    graph.set_entry_point("collect_data")
+    graph.add_edge("collect_data", "analyze")
+    graph.add_edge("analyze", "write_report")
+    graph.set_finish_point("write_report")
+    
+    # Compile
+    app = graph.compile()
+    
+    logger.success("✅ Research graph compiled successfully")
+    
+    return app
+
+
+def run_research_workflow(ticker: str, company_name: str = None):
+    """
+    Convenience function to run complete workflow.
+    
+    Args:
+        ticker: Company ticker (e.g., "RELIANCE")
+        company_name: Optional company name
+        
+    Returns:
+        Complete EquityResearchState with all data and analysis
+    """
+    app = create_research_graph()
+    
+    initial_state = {
+        'ticker': ticker,
+        'company_name': company_name or ticker,
+        'errors': [],
+        'warnings': [],
+        'current_step': 'start',
+        'data_complete': False
+    }
+    
+    logger.info(f"🚀 Starting equity research workflow for {ticker}")
+    
+    result = app.invoke(initial_state)
+    
+    logger.success(f"✅ Workflow complete for {ticker}")
+    logger.info(f"   Data Quality: {result.get('data_quality_score', 0):.1%}")
+    logger.info(f"   Errors: {len(result.get('errors', []))}")
+    logger.info(f"   Warnings: {len(result.get('warnings', []))}")
+    
+    return result
+
+
+# Usage:
+# from agents.graph import run_research_workflow
+# state = run_research_workflow("RELIANCE", "Reliance Industries")
+```
+
+---
+
+### 🧪 Step 7.2: Comprehensive Integration Testing
+**Duration:** 1.5 hours  
+**Status:** ⏳ Pending
+
+**Files to Create:**
+- `tests/test_integration.py`
+
+**Test Suite:**
+```python
+import pytest
+from agents.graph import run_research_workflow
+
+def test_reliance_full_workflow():
+    """Test complete workflow with RELIANCE."""
+    result = run_research_workflow("RELIANCE", "Reliance Industries")
+    
+    # Data collection checks
+    assert result['data_complete'] == True
+    assert result['data_quality_score'] >= 0.8
+    assert result['company_info'] is not None
+    
+    # Analysis checks
+    assert result['ratios'] is not None
+    assert result['beta'] is not None
+    assert result['cost_of_equity'] is not None
+    
+    # Report checks
+    assert result['executive_summary'] is not None
+    assert len(result['executive_summary']) > 100
+    
+    print("✅ RELIANCE: Full workflow passed")
+
+
+def test_tcs_full_workflow():
+    """Test with TCS (IT sector)."""
+    result = run_research_workflow("TCS", "Tata Consultancy Services")
+    
+    assert result['data_quality_score'] >= 0.7
+    assert result['ratios'] is not None
+    
+    print("✅ TCS: Full workflow passed")
+
+
+def test_infy_full_workflow():
+    """Test with INFY (another IT company)."""
+    result = run_research_workflow("INFY", "Infosys")
+    
+    assert result['data_quality_score'] >= 0.7
+    
+    print("✅ INFY: Full workflow passed")
+
+
+def test_error_handling_invalid_ticker():
+    """Test error handling with invalid ticker."""
+    result = run_research_workflow("INVALID123")
+    
+    # Should complete but with errors
+    assert len(result['errors']) > 0
+    assert result['data_quality_score'] < 0.5
+    
+    print("✅ Error handling: Passed")
+
+
+@pytest.mark.parametrize("ticker,company", [
+    ("RELIANCE", "Reliance Industries"),
+    ("TCS", "Tata Consultancy Services"),
+    ("INFY", "Infosys"),
+])
+def test_multiple_companies(ticker, company):
+    """Test with multiple companies."""
+    result = run_research_workflow(ticker, company)
+    
+    assert result is not None
+    assert result['ticker'] == ticker
+    
+    print(f"✅ {ticker}: Passed")
+```
+
+**Testing Checklist:**
+- [ ] Test with 3 NIFTY 50 companies (RELIANCE, TCS, INFY)
 - [ ] Test error handling (invalid ticker)
-- [ ] Test retry logic
-- [ ] Generate data quality reports
-
-**Deliverables:**
-- Fully functional Data Collection Agent
-- Sample CSV files for test companies
-- Test suite passing
+- [ ] Test with non-dividend paying company
+- [ ] Measure performance (time per company)
+- [ ] Check memory usage
+- [ ] Verify state flow through all nodes
+- [ ] Validate all report sections generated
 
 ---
 
-## Phase 4: Analysis Tools (3-4 hours)
+### 📊 Step 7.3: Performance Optimization & Monitoring
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
 
-### 📊 Step 4.1: Ratio Calculation Tools
-**Duration:** 2 hours
-
-**Files to Create:**
-- `tools/analysis_tools.py`
-
-**Functions to Implement:**
+**Add Performance Tracking:**
 ```python
-# Liquidity Ratios
-1. calculate_current_ratio(balance_sheet)
-2. calculate_cash_ratio(balance_sheet)
+import time
+from functools import wraps
 
-# Efficiency Ratios
-3. calculate_asset_turnover(income, balance_sheet)
-4. calculate_inventory_turnover(income, balance_sheet)
-5. calculate_receivables_turnover(income, balance_sheet)
-
-# Solvency Ratios
-6. calculate_debt_to_equity(balance_sheet)
-7. calculate_interest_coverage(income)
-
-# Profitability Ratios
-8. calculate_net_profit_margin(income)
-9. calculate_roe(income, balance_sheet)
-10. calculate_roa(income, balance_sheet)
-11. calculate_gross_margin(income)
-
-# Helper function
-12. calculate_all_ratios(financial_data)
-    - Returns dictionary with all ratios for 5 years
-```
-
----
-
-### 📊 Step 4.2: Risk Analysis Tools (CAPM/Beta)
-**Duration:** 1.5 hours
-
-**Functions to Implement:**
-```python
-1. calculate_returns(price_data)
-   - Convert prices to returns
-   
-2. calculate_beta(stock_returns, market_returns)
-   - Linear regression
-   - Return beta coefficient
-   
-3. calculate_statistics(returns)
-   - Mean, std dev, Sharpe ratio
-   
-4. calculate_capm(risk_free_rate, beta, market_return)
-   - Expected return / Cost of equity
-```
-
-**Testing:**
-- Verify beta matches published values
-- Test with known high-beta and low-beta stocks
-
----
-
-### 📊 Step 4.3: Valuation Tools
-**Duration:** 1 hour
-
-**Functions to Implement:**
-```python
-1. estimate_dividend_growth_rate(dividend_history)
-   - Historical growth calculation
-   
-2. perform_ddm_valuation(dividend, growth_rate, cost_of_equity)
-   - Gordon Growth Model
-   - Return intrinsic value
-   
-3. compare_to_market_price(intrinsic_value, market_price)
-   - Generate recommendation
-```
-
----
-
-## Phase 5: Agent 2 - Financial Analyst Agent (2-3 hours)
-
-### 🤖 Step 5.1: Agent Implementation
-**Duration:** 1.5 hours
-
-**Files to Create:**
-- `agents/analyst_agent.py`
-
-**Implementation:**
-```python
-class FinancialAnalystAgent:
-    def __init__(self, llm, analysis_tools):
-        """Initialize with LLM and calculation tools"""
+def track_node_performance(func):
+    """Decorator to track node execution time."""
+    @wraps(func)
+    def wrapper(state, *args, **kwargs):
+        start = time.time()
+        result = func(state, *args, **kwargs)
+        duration = time.time() - start
         
-    def analyze(self, csv_paths):
-        """Main analysis orchestration"""
-        # 1. Load CSV data
-        # 2. Calculate all ratios
-        # 3. Calculate beta/CAPM
-        # 4. Perform DDM valuation
-        # 5. Generate insights
-        # 6. Return structured results
-```
-
----
-
-### 🤖 Step 5.2: Visualization Tools
-**Duration:** 1 hour
-
-**Files to Create:**
-- `tools/visualization_tools.py`
-
-**Functions to Implement:**
-```python
-1. create_ratio_trend_chart(ratio_data, ratio_name)
-2. create_beta_scatter_plot(stock_returns, market_returns)
-3. create_dividend_growth_chart(dividend_history)
-4. create_peer_comparison_chart(company_data, peer_data)
-```
-
----
-
-### 🤖 Step 5.3: Excel Generation
-**Duration:** 1 hour
-
-**Files to Create:**
-- `tools/excel_tools.py`
-
-**Implementation:**
-```python
-def create_excel_workbook(ticker, all_data):
-    # Sheet 1: Raw Financial Data
-    # Sheet 2: Ratio Calculations
-    # Sheet 3: Beta/CAPM Analysis
-    # Sheet 4: DDM Valuation
-    # Sheet 5: Charts
-    # Sheet 6: Summary
-```
-
-**Deliverables:**
-- Fully functional Analyst Agent
-- Sample Excel workbooks
-- All charts generated
-
----
-
-## Phase 6: Agent 3 - Research & Synthesis Agent (2-3 hours)
-
-### 🤖 Step 6.1: Research Tools
-**Duration:** 1 hour
-
-**Files to Create:**
-- `tools/synthesis_tools.py`
-
-**Functions to Implement:**
-```python
-1. generate_company_overview(company_info, llm)
-2. analyze_corporate_strategy(company_info, financials, llm)
-3. analyze_competitors(company_data, competitor_data, llm)
-4. synthesize_recent_developments(news_data, llm)
-5. generate_ratio_commentary(ratio_name, values, trend, llm)
-```
-
----
-
-### 🤖 Step 6.2: Agent Implementation
-**Duration:** 1.5 hours
-
-**Files to Create:**
-- `agents/research_agent.py`
-
-**Implementation:**
-```python
-class ResearchSynthesisAgent:
-    def __init__(self, llm, research_tools):
-        """Initialize with LLM and synthesis tools"""
+        logger.info(f"⏱️  {func.__name__} completed in {duration:.2f}s")
         
-    def research_and_write(self, csv_paths, analysis_results):
-        """Main research orchestration"""
-        # 1. Generate company overview
-        # 2. Analyze strategy
-        # 3. Research competitors
-        # 4. Synthesize developments
-        # 5. Create commentary for all metrics
-        # 6. Return structured content
-```
+        return result
+    return wrapper
 
----
-
-### 🤖 Step 6.3: Document Generation
-**Duration:** 1 hour
-
-**Files to Create:**
-- `tools/document_tools.py`
-
-**Functions to Implement:**
-```python
-1. load_template(template_path)
-2. fill_template_section(doc, section_name, content)
-3. insert_table(doc, data)
-4. insert_chart(doc, image_path)
-5. apply_formatting(doc)
-6. save_document(doc, output_path)
+# Apply to nodes
+@track_node_performance
+def collect_data_node(state):
+    # ... implementation
 ```
 
 **Deliverables:**
-- Fully functional Research Agent
-- Sample Word documents
+- ✅ Complete, compiled LangGraph workflow
+- ✅ All integration tests passing
+- ✅ Performance benchmarks established
+- ✅ Error handling validated
+- ✅ Ready for Phase 8 (Report Generation)
 
 ---
 
-## Phase 7: LangGraph Orchestration (2-3 hours)
+## Summary: Phases 3-7 Complete
 
-### 🔄 Step 7.1: State Management
-**Duration:** 1 hour
+**What We Built:**
+1. ✅ **Phase 3:** State schema + StateGraph structure
+2. ✅ **Phase 4:** Deterministic data collection node
+3. ✅ **Phase 5:** Deterministic financial analysis node
+4. ✅ **Phase 6:** LLM-powered report writing node
+5. ✅ **Phase 7:** Complete integrated workflow
 
-**Files to Create:**
-- `orchestrator/state.py`
+**Architecture:**
+- ✅ One unified `EquityResearchState`
+- ✅ 3 nodes in sequential workflow
+- ✅ 2 deterministic nodes (data + analysis)
+- ✅ 1 LLM-powered node (writing)
+- ✅ Proper LangGraph implementation
 
-**Implementation:**
-```python
-class ResearchState(TypedDict):
-    ticker: str
-    company_name: Optional[str]
-    data_collected: bool
-    csv_paths: Dict[str, str]
-    analysis_results: Dict
-    research_results: Dict
-    excel_path: Optional[str]
-    word_doc_path: Optional[str]
-    errors: List[str]
-    status: str
+**Next Steps:**
+- Move to Phase 8: Report Generation (Word + Excel output)
+- Move to Phase 9: UI Development (Streamlit)
+- Move to Phase 10: Final Testing & Deployment
+
+**Current File Structure:**
 ```
-
----
-
-### 🔄 Step 7.2: Graph Construction
-**Duration:** 1.5 hours
-
-**Files to Create:**
-- `orchestrator/graph.py`
-
-**Implementation:**
-```python
-1. Define all nodes (agents and validators)
-2. Define edges (workflow transitions)
-3. Add conditional edges (error handling)
-4. Set up parallel execution for Agent 2 & 3
-5. Compile graph
+agents/
+├── __init__.py
+├── state.py                    # EquityResearchState schema
+├── graph.py                    # StateGraph + workflow
+├── llm_config.py              # LLM configuration
+├── prompts.py                 # LLM prompt templates
+└── nodes/
+    ├── __init__.py
+    ├── data_collection.py      # Node 1 (deterministic)
+    ├── financial_analysis.py   # Node 2 (deterministic)
+    └── report_writing.py       # Node 3 (LLM agent)
 ```
-
----
-
-### 🔄 Step 7.3: Integration Testing
-**Duration:** 1 hour
-
-- [ ] Test end-to-end flow with 1 company
-- [ ] Test error scenarios
-- [ ] Test partial data scenarios
-- [ ] Verify all outputs generated correctly
-
-**Deliverables:**
-- Working orchestrator
-- Complete reports for test companies
 
 ---
 
