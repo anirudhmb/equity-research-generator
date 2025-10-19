@@ -3,12 +3,20 @@ News & Research Scraper for Indian Companies.
 
 This module provides functions to fetch recent news and developments
 from various free sources:
-- Google News RSS feeds
-- MoneyControl (basic scraping)
-- Economic Times (basic scraping)
-- NSE India announcements
+- Google News RSS feeds (Primary source)
+- MoneyControl (Secondary source via web scraping)
+- Economic Times (Expandable)
+- NSE India announcements (Expandable)
 
 All sources are free and do not require API keys.
+
+IMPORTANT LIMITATION:
+- Google News RSS feeds typically retain only 2-3 months of articles
+- Requesting more months will still only return what's available
+- This is a known limitation of free news sources
+- For historical analysis beyond 3 months, paid news APIs would be required
+- However, 2-3 months is sufficient for the "Recent Developments" section
+  of an equity research report
 """
 
 import sys
@@ -259,24 +267,74 @@ def fetch_all_news(company_name: str, ticker: str, months: int = MONTHS_OF_NEWS)
     # Remove duplicates based on title similarity
     df = _remove_duplicate_articles(df)
     
-    logger.success(f"\n✅ Total news articles fetched: {len(df)}")
-    logger.info(f"   Google News: {len([a for a in all_articles if a['source'] != 'MoneyControl'])}")
-    logger.info(f"   MoneyControl: {len([a for a in all_articles if a['source'] == 'MoneyControl'])}")
+    # Show date range
+    if not df.empty:
+        oldest_date = df['published'].min().strftime('%Y-%m-%d')
+        newest_date = df['published'].max().strftime('%Y-%m-%d')
+        actual_months = (df['published'].max() - df['published'].min()).days / 30
+        
+        logger.success(f"\n✅ Total news articles fetched: {len(df)}")
+        logger.info(f"   Google News: {len([a for a in all_articles if a['source'] != 'MoneyControl'])}")
+        logger.info(f"   MoneyControl: {len([a for a in all_articles if a['source'] == 'MoneyControl'])}")
+        logger.info(f"   Date Range: {oldest_date} to {newest_date} ({actual_months:.1f} months)")
+        
+        if actual_months < months * 0.8:  # If we got less than 80% of requested time
+            logger.warning(f"   ⚠️  Note: Requested {months} months but Google News RSS only retains ~2-3 months")
     
     return df
 
 
-def _remove_duplicate_articles(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove duplicate articles based on title similarity."""
+def _remove_duplicate_articles(df: pd.DataFrame, similarity_threshold: float = 0.85) -> pd.DataFrame:
+    """
+    Remove duplicate articles based on title similarity using fuzzy matching.
+    
+    This handles cases where the same story is reported by multiple sources
+    with slightly different headlines.
+    
+    Args:
+        df: DataFrame with news articles
+        similarity_threshold: Titles with similarity >= this are considered duplicates (0-1)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
     if df.empty:
         return df
     
-    # Simple deduplication: remove exact title matches
+    from difflib import SequenceMatcher
+    
+    initial_count = len(df)
+    
+    # First, remove exact duplicates
     df = df.drop_duplicates(subset=['title'], keep='first')
     
-    # Could add fuzzy matching here for better deduplication
+    # Then, remove fuzzy duplicates
+    to_remove = set()
+    titles = df['title'].tolist()
     
-    return df
+    for i in range(len(titles)):
+        if i in to_remove:
+            continue
+            
+        for j in range(i + 1, len(titles)):
+            if j in to_remove:
+                continue
+            
+            # Calculate similarity
+            similarity = SequenceMatcher(None, titles[i].lower(), titles[j].lower()).ratio()
+            
+            if similarity >= similarity_threshold:
+                # Keep the first one (newer), mark the second as duplicate
+                to_remove.add(j)
+                logger.debug(f"Removing duplicate: '{titles[j][:60]}...' (similar to '{titles[i][:60]}...')")
+    
+    # Remove duplicates
+    if to_remove:
+        df = df.iloc[[i for i in range(len(df)) if i not in to_remove]]
+        removed_count = initial_count - len(df)
+        logger.info(f"   Removed {removed_count} duplicate/similar articles")
+    
+    return df.reset_index(drop=True)
 
 
 def categorize_news(news_df: pd.DataFrame) -> Dict[str, List[Dict]]:
@@ -353,6 +411,59 @@ def categorize_news(news_df: pd.DataFrame) -> Dict[str, List[Dict]]:
     return categories
 
 
+def get_news_timeline(news_df: pd.DataFrame) -> Dict:
+    """
+    Get timeline statistics showing news distribution over time.
+    
+    Args:
+        news_df: DataFrame with news articles
+    
+    Returns:
+        Dictionary with timeline statistics
+    
+    Example:
+        >>> news_df = fetch_all_news("Reliance", "RELIANCE")
+        >>> timeline = get_news_timeline(news_df)
+        >>> print(f"Total articles: {timeline['total']}")
+        >>> print(f"Date range: {timeline['date_range']}")
+    """
+    if news_df.empty:
+        return {
+            'total': 0,
+            'date_range': 'No data',
+            'by_month': {},
+            'by_week': {},
+            'sources': {}
+        }
+    
+    # Overall stats
+    oldest = news_df['published'].min()
+    newest = news_df['published'].max()
+    
+    # Group by month
+    news_df['month'] = news_df['published'].dt.to_period('M')
+    by_month = news_df.groupby('month').size().to_dict()
+    by_month = {str(k): v for k, v in by_month.items()}
+    
+    # Group by week
+    news_df['week'] = news_df['published'].dt.to_period('W')
+    by_week = news_df.groupby('week').size().to_dict()
+    by_week = {str(k): v for k, v in by_week.items()}
+    
+    # Group by source
+    by_source = news_df['source'].value_counts().to_dict()
+    
+    return {
+        'total': len(news_df),
+        'date_range': f"{oldest.strftime('%Y-%m-%d')} to {newest.strftime('%Y-%m-%d')}",
+        'duration_days': (newest - oldest).days,
+        'by_month': by_month,
+        'by_week': by_week,
+        'sources': by_source,
+        'avg_per_week': len(news_df) / max(((newest - oldest).days / 7), 1)
+    }
+
+
 def get_recent_developments_summary(news_df: pd.DataFrame, limit: int = 10) -> List[Dict]:
     """
     Get summary of recent developments for the report.
@@ -409,7 +520,7 @@ def save_news_to_csv(news_df: pd.DataFrame, ticker: str) -> str:
 
 if __name__ == "__main__":
     # Test the module
-    print("Testing News Scraper...")
+    print("Testing News Scraper with Enhanced Deduplication & Timeline Analysis...")
     
     test_company = "Reliance Industries"
     test_ticker = "RELIANCE"
@@ -417,21 +528,33 @@ if __name__ == "__main__":
     try:
         print(f"\nFetching news for {test_company}...")
         
-        # Fetch all news
-        news_df = fetch_all_news(test_company, test_ticker, months=3)
+        # Fetch all news (will request 12 months but likely get 2-3 months due to RSS limitations)
+        news_df = fetch_all_news(test_company, test_ticker, months=12)
         
         if news_df.empty:
             print("\n❌ No news articles found")
         else:
-            print(f"\n✅ Test successful! Fetched {len(news_df)} articles")
+            print(f"\n✅ Test successful! Fetched {len(news_df)} unique articles (after deduplication)")
+            
+            # Show timeline analysis
+            print(f"\n📅 Timeline Analysis:")
+            timeline = get_news_timeline(news_df)
+            print(f"   Date Range: {timeline['date_range']}")
+            print(f"   Duration: {timeline['duration_days']} days")
+            print(f"   Average: {timeline['avg_per_week']:.1f} articles/week")
+            print(f"\n   Distribution by Month:")
+            for month, count in sorted(timeline['by_month'].items()):
+                print(f"      {month}: {count} articles")
+            print(f"\n   Sources:")
+            for source, count in timeline['sources'].items():
+                print(f"      {source}: {count} articles")
             
             # Show recent articles
             print(f"\n📰 Recent Articles (Last 5):")
             recent = news_df.head(5)
             for idx, article in recent.iterrows():
                 print(f"\n{idx + 1}. [{article['published_str']}] {article['source']}")
-                print(f"   {article['title']}")
-                print(f"   {article['link'][:80]}...")
+                print(f"   {article['title'][:100]}...")
             
             # Categorize news
             print(f"\n📊 News Categories:")
@@ -443,6 +566,7 @@ if __name__ == "__main__":
             # Save to CSV
             filepath = save_news_to_csv(news_df, test_ticker)
             print(f"\n💾 Saved to: {filepath}")
+            print(f"\n✨ The CSV contains unique, deduplicated articles covering the timeline above")
             
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
