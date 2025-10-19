@@ -21,35 +21,49 @@ This system automates the complete equity research report generation process as 
 
 ## 🏗️ Architecture
 
-### 3-Agent System
+### LangGraph StateGraph with 3 Sequential Nodes
 
 ```
 User Input (Ticker)
     ↓
-┌─────────────────────────────────┐
-│   LangGraph Orchestrator        │
-└─────────────────────────────────┘
-    ↓
-┌─────────────────────────────────┐
-│   Agent 1: Data Collection      │
-│   Fetches & prepares raw data   │
-└─────────────────────────────────┘
-    ↓ (CSV Files)
-    ├──────────────┬───────────────┐
-    ↓              ↓               ↓
-┌──────────┐  ┌────────────┐  ┌──────────┐
-│ Agent 2  │  │  Agent 3   │  │          │
-│ Analyst  │  │  Research  │  │ Parallel │
-│ Numbers  │  │  Insights  │  │          │
-└──────────┘  └────────────┘  └──────────┘
-    ↓              ↓
-    └──────┬───────┘
-           ↓
+┌──────────────────────────────────────────────────┐
+│        LangGraph StateGraph Workflow             │
+│                                                  │
+│   ┌──────────────────────────────────────┐      │
+│   │   EquityResearchState (Shared)       │      │
+│   │   • Data • Analysis • Report Text    │      │
+│   └──────────────────────────────────────┘      │
+│                    ↓                             │
+│   ┌──────────────────────────────────────┐      │
+│   │  Node 1: collect_data_node()         │      │
+│   │  (Deterministic - No LLM)            │      │
+│   │  • yfinance, news scraping           │      │
+│   └──────────────────────────────────────┘      │
+│                    ↓ (updates state)             │
+│   ┌──────────────────────────────────────┐      │
+│   │  Node 2: analyze_node()              │      │
+│   │  (Deterministic - No LLM)            │      │
+│   │  • 18 ratios, Beta, CAPM, DDM        │      │
+│   └──────────────────────────────────────┘      │
+│                    ↓ (updates state)             │
+│   ┌──────────────────────────────────────┐      │
+│   │  Node 3: write_report_node()         │      │
+│   │  (LLM-Powered - Groq/Gemini)         │      │
+│   │  • Synthesizes insights              │      │
+│   └──────────────────────────────────────┘      │
+└──────────────────────────────────────────────────┘
+                    ↓ (final state)
 ┌─────────────────────────────────┐
 │   Document Generation           │
 │   Word Report + Excel File      │
 └─────────────────────────────────┘
 ```
+
+**Key Design:**
+- ✅ **One Shared State**: `EquityResearchState` flows through all nodes
+- ✅ **Sequential Workflow**: Data → Analysis → Writing
+- ✅ **Cost-Effective**: LLM only used for report writing (Node 3)
+- ✅ **Type-Safe**: TypedDict state schema with validation
 
 ---
 
@@ -57,44 +71,49 @@ User Input (Ticker)
 
 ```
 Assignment/
-├── agents/              # 3 specialized agents
-│   ├── data_agent.py
-│   ├── analyst_agent.py
-│   └── research_agent.py
+├── agents/              # LangGraph nodes & state
+│   ├── __init__.py
+│   ├── state.py         # EquityResearchState schema
+│   ├── graph.py         # StateGraph definition
+│   ├── llm_config.py    # LLM setup (Groq/Gemini)
+│   ├── prompts.py       # LLM prompt templates
+│   └── nodes/           # Node functions
+│       ├── data_collection.py      # Node 1 (deterministic)
+│       ├── financial_analysis.py   # Node 2 (deterministic)
+│       └── report_writing.py       # Node 3 (LLM-powered)
 │
-├── tools/               # Agent tools
-│   ├── data_tools.py
-│   ├── analysis_tools.py
-│   ├── research_tools.py
-│   ├── visualization_tools.py
-│   ├── excel_tools.py
-│   └── document_tools.py
-│
-├── orchestrator/        # LangGraph workflow
-│   ├── graph.py
-│   └── state.py
-│
-├── ui/                  # Web interface
-│   └── app.py
+├── tools/               # Reusable tool functions
+│   ├── data_tools.py           # yfinance wrappers (✅ Complete)
+│   ├── ratio_calculator.py     # 18 financial ratios (✅ Complete)
+│   ├── market_tools.py         # Beta, CAPM, DDM (✅ Complete)
+│   └── news_scraper.py         # News aggregation (✅ Complete)
 │
 ├── config/              # Configuration
-│   └── settings.py
+│   ├── settings.py      # Centralized config
+│   └── env_template.txt # Environment variables
 │
 ├── utils/               # Utilities
-│   ├── validators.py
-│   └── helpers.py
+│   └── logger.py        # Colored logging
 │
 ├── tests/               # Test suite
+│   ├── test_data_collection_node.py
+│   ├── test_financial_analysis_node.py
+│   ├── test_report_writing_node.py
+│   └── test_integration.py
+│
+├── ui/                  # Web interface
+│   └── app.py           # Streamlit UI
 │
 ├── docs/                # Documentation
-│   ├── requirements.md
-│   ├── architecture.md
-│   └── roadmap.md
+│   ├── architecture.md  # LangGraph architecture
+│   ├── roadmap.md       # Implementation roadmap
+│   ├── requirements.md  # Assignment requirements
+│   └── INDIAN_MARKETS_SETUP.md
 │
 ├── templates/           # Original assignment files
 ├── data/                # Generated CSV storage
 ├── outputs/             # Generated reports
-└── scripts/             # Utility scripts
+└── .env                 # API keys (not in git)
 ```
 
 ---
