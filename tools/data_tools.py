@@ -205,17 +205,43 @@ def fetch_financial_statements(
         balance_sheet = stock.balance_sheet
         cash_flow = stock.cashflow
     
+    # Clean up statements - remove columns with >90% missing data
+    def clean_statement(df: pd.DataFrame, name: str) -> pd.DataFrame:
+        if df.empty:
+            return df
+        
+        # Calculate completeness for each column
+        completeness = {}
+        for col in df.columns:
+            non_empty = df[col].notna().sum()
+            total = len(df)
+            completeness[col] = non_empty / total if total > 0 else 0
+        
+        # Keep only columns with >10% data (i.e., <90% empty)
+        valid_cols = [col for col, comp in completeness.items() if comp > 0.10]
+        
+        if len(valid_cols) < len(df.columns):
+            removed = len(df.columns) - len(valid_cols)
+            logger.warning(f"Removed {removed} incomplete period(s) from {name} (>90% missing data)")
+        
+        return df[valid_cols] if valid_cols else df
+    
+    # Clean statements
+    income_stmt = clean_statement(income_stmt, "Income Statement")
+    balance_sheet = clean_statement(balance_sheet, "Balance Sheet")
+    cash_flow = clean_statement(cash_flow, "Cash Flow")
+    
     # Check if data is available
     statements_available = []
-    if not income_stmt.empty:
-        statements_available.append("Income Statement")
-    if not balance_sheet.empty:
-        statements_available.append("Balance Sheet")
-    if not cash_flow.empty:
-        statements_available.append("Cash Flow")
+    if not income_stmt.empty and len(income_stmt.columns) > 0:
+        statements_available.append(f"Income Statement ({len(income_stmt.columns)} periods)")
+    if not balance_sheet.empty and len(balance_sheet.columns) > 0:
+        statements_available.append(f"Balance Sheet ({len(balance_sheet.columns)} periods)")
+    if not cash_flow.empty and len(cash_flow.columns) > 0:
+        statements_available.append(f"Cash Flow ({len(cash_flow.columns)} periods)")
     
     if not statements_available:
-        raise ValueError(f"No financial statements available for {full_ticker}")
+        raise ValueError(f"No valid financial statements available for {full_ticker}")
     
     logger.success(f"✅ Fetched: {', '.join(statements_available)}")
     return income_stmt, balance_sheet, cash_flow
@@ -614,7 +640,7 @@ if __name__ == "__main__":
     test_ticker = "RELIANCE"
     
     try:
-        data = fetch_all_company_data(test_ticker, years=5, save_to_file=True)
+        data = fetch_all_company_data(test_ticker, years=6, save_to_file=True)
         print(f"\n✅ Test successful for {test_ticker}")
         print(f"Company: {data['info']['company_name']}")
         print(f"Sector: {data['info']['sector']}")

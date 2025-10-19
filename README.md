@@ -102,10 +102,12 @@ Assignment/
 ## ✨ Features
 
 ### Automated Data Collection (Free Sources)
-- ✅ 5 years of financial statements from **yfinance** (NSE/BSE)
-- ✅ Historical stock prices for beta calculation
+- ✅ 4 years of annual financial statements from **yfinance** (NSE/BSE)*
+- ✅ 6 years of historical stock prices for beta calculation
 - ✅ Company information and metadata from NSE India
 - ✅ Competitor analysis for Indian companies
+
+**\*Data Availability Note:** yfinance provides 4 years of complete annual financial statements (e.g., 2022-2025) due to Yahoo Finance's data retention policy. This is sufficient for comprehensive financial analysis including 5-year price history, ratio trends, and valuation models.
 - ✅ Recent news from MoneyControl, Economic Times
 
 ### Comprehensive Analysis (Indian Market Focus)

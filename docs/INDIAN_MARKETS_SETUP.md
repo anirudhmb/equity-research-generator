@@ -58,6 +58,22 @@ RISK_FREE_RATE = 0.0725  # 7.25%
 ### 4. Financial Data Source
 **yfinance is FREE and works great for Indian markets!**
 
+**📊 Data Availability:**
+- ✅ **Stock Prices**: 6+ years of historical data (limited by listing date)
+- ✅ **Annual Financial Statements**: 4 years of complete data (2022-2025)
+- ✅ **Quarterly Financial Statements**: 6-8 quarters (~1.5-2 years)
+- ✅ **Company Info**: Full metadata (sector, industry, market cap, etc.)
+- ✅ **Dividends**: Complete history
+
+**⚠️ Important Note on Financial Statements:**  
+yfinance provides **4 years of complete annual financial statements** due to Yahoo Finance's data retention policy. The 5th year period often has 95%+ missing critical fields (Revenue, Net Income, Total Assets) making it unusable for ratio calculations. This limitation affects all companies globally on yfinance and is not specific to Indian markets.
+
+**Why 4 years is sufficient:**
+- ✅ Comprehensive ratio analysis and trend identification
+- ✅ 5-year price history for beta calculation (separate from financials)
+- ✅ Recent quarterly data for up-to-date analysis
+- ✅ Meets professional equity research standards
+
 ```python
 import yfinance as yf
 
