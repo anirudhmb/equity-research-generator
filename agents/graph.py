@@ -129,39 +129,11 @@ def get_llm(provider: Optional[str] = None):
         )
 
 
-# ==================== PLACEHOLDER NODE FUNCTIONS ====================
-# These are temporary stubs - will be replaced with full implementations
-# in Phases 4, 5, and 6
+# ==================== REAL & PLACEHOLDER NODE FUNCTIONS ====================
+# Import real implementations from nodes package
+from agents.nodes import collect_data_node  # ✅ Phase 4 Complete!
 
-def collect_data_node(state: EquityResearchState) -> Dict[str, Any]:
-    """
-    Data Collection Node (PLACEHOLDER).
-    
-    This is a temporary stub. Will be implemented in Phase 4.
-    
-    Purpose:
-        - Fetch company info from yfinance
-        - Fetch historical stock prices (6 years)
-        - Fetch financial statements (4 years)
-        - Fetch dividends
-        - Fetch market index (NIFTY 50)
-        - Fetch news (Google News + MoneyControl)
-    
-    Args:
-        state: Current EquityResearchState
-    
-    Returns:
-        Dict with state updates (company_info, stock_prices, etc.)
-    """
-    logger.info(f"📊 [PLACEHOLDER] Data Collection for {state['ticker']}")
-    logger.warning("⚠️  This is a placeholder - will be implemented in Phase 4")
-    
-    # Placeholder return
-    return {
-        'current_step': 'data_collection',
-        'data_complete': False,
-        'data_quality_score': 0.0
-    }
+# These are temporary stubs - will be replaced in Phases 5 and 6
 
 
 def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
