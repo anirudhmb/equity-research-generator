@@ -131,40 +131,9 @@ def get_llm(provider: Optional[str] = None):
 
 # ==================== REAL & PLACEHOLDER NODE FUNCTIONS ====================
 # Import real implementations from nodes package
-from agents.nodes import collect_data_node  # ✅ Phase 4 Complete!
+from agents.nodes import collect_data_node, analyze_node  # ✅ Phase 4 & 5 Complete!
 
-# These are temporary stubs - will be replaced in Phases 5 and 6
-
-
-def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
-    """
-    Financial Analysis Node (PLACEHOLDER).
-    
-    This is a temporary stub. Will be implemented in Phase 5.
-    
-    Purpose:
-        - Calculate 18 financial ratios
-        - Calculate beta (vs NIFTY 50)
-        - Calculate CAPM cost of equity
-        - Perform DDM valuation
-        - Generate recommendation
-    
-    Args:
-        state: Current EquityResearchState with collected data
-    
-    Returns:
-        Dict with state updates (ratios, beta, ddm_valuation, etc.)
-    """
-    logger.info(f"📈 [PLACEHOLDER] Financial Analysis for {state['ticker']}")
-    logger.warning("⚠️  This is a placeholder - will be implemented in Phase 5")
-    
-    # Placeholder return
-    return {
-        'current_step': 'analysis',
-        'ratios': {},
-        'beta': None,
-        'cost_of_equity': None
-    }
+# This is a temporary stub - will be replaced in Phase 6
 
 
 def write_report_node(state: EquityResearchState) -> Dict[str, Any]:
