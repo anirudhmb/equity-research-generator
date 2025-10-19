@@ -95,14 +95,21 @@ Assignment/
 ├── utils/               # Utilities
 │   └── logger.py        # Colored logging
 │
+├── generators/          # Document generation
+│   ├── word_generator.py       # Word report (.docx)
+│   └── excel_generator.py      # Excel workbook (.xlsx)
+│
+├── ui/                  # Streamlit web interface (✅ Complete)
+│   ├── app.py           # Main Streamlit app
+│   └── README.md        # UI documentation
+│
 ├── tests/               # Test suite
 │   ├── test_data_collection_node.py
 │   ├── test_financial_analysis_node.py
 │   ├── test_report_writing_node.py
 │   └── test_integration.py
 │
-├── ui/                  # Web interface
-│   └── app.py           # Streamlit UI
+├── run_ui.py            # UI launcher script (✅ Complete)
 │
 ├── docs/                # Documentation
 │   ├── architecture.md  # LangGraph architecture
@@ -231,20 +238,41 @@ cp config/env_template.txt .env
 
 ### Usage
 
-#### Via UI (Recommended)
+#### 🖥️ Via Web UI (Recommended)
+
+Launch the Streamlit interface:
+
 ```bash
+# Option 1: Using launcher script
+python run_ui.py
+
+# Option 2: Direct streamlit command
 streamlit run ui/app.py
 ```
 
-Then:
-1. Enter Indian company ticker (e.g., "RELIANCE.NS", "TCS.BO", "INFY.NS")
-2. Click "Generate Report"
-3. Wait ~5-10 minutes
-4. Download Word document and Excel file
+The UI will open in your browser at `http://localhost:8501`
 
-#### Via Python Script
+**Steps:**
+1. Enter company ticker (e.g., `RELIANCE`, `TCS`, `INFY`)
+   - **Important**: Enter ticker WITHOUT `.NS` or `.BO` suffix
+   - The system auto-detects NSE/BSE exchange
+2. Optionally enter full company name
+3. Select output formats (Word, Excel, or both)
+4. Click "🚀 Generate Report"
+5. Wait 2-5 minutes (progress bar shown)
+6. Download your reports!
+
+**✨ UI Features:**
+- Real-time progress tracking
+- Key metrics dashboard
+- Financial ratios breakdown
+- Error handling & warnings
+- One-click downloads
+
+#### 📝 Via Python Script
 ```python
-from orchestrator.graph import create_research_graph
+from agents import create_research_graph, create_initial_state
+from generators import generate_word_report, generate_excel_workbook
 
 # Initialize
 graph = create_research_graph()
