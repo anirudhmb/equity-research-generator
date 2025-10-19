@@ -22,8 +22,12 @@ from agents.graph import get_llm
 from utils.logger import logger
 
 # LangChain imports
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import HumanMessage, SystemMessage
+try:
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.messages import HumanMessage, SystemMessage
+except ImportError:
+    from langchain.prompts import ChatPromptTemplate
+    from langchain.schema import HumanMessage, SystemMessage
 
 
 # ==================== PROMPTS ====================
