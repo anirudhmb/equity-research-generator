@@ -1,0 +1,53 @@
+# Core LLM Framework
+langchain>=0.1.0
+langgraph>=0.0.20
+langchain-community>=0.0.20
+
+# LLM Provider - Groq (Free Tier)
+langchain-groq>=0.0.1
+groq>=0.4.0
+
+# Alternative LLM Options (Optional)
+# langchain-ollama>=0.0.1  # For local Ollama
+# langchain-google-genai>=0.0.5  # For Google Gemini
+
+# Data Collection & Processing
+yfinance>=0.2.35
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Web Scraping & News
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+feedparser>=6.0.10
+lxml>=4.9.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.18.0
+
+# Document Generation
+python-docx>=1.1.0
+openpyxl>=3.1.0
+Jinja2>=3.1.0
+
+# UI Framework
+streamlit>=1.28.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+loguru>=0.7.0
+
+# Development & Testing (Optional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.1.0
+
+# Progress bars and utilities
+tqdm>=4.66.0
+colorama>=0.4.6
+
