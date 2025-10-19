@@ -2,22 +2,46 @@
 
 ## Project Timeline: Automated Equity Research Report Generator
 
-**Estimated Total Time:** 15-20 hours of development
-**Target Completion:** Before October 31, 2025
+**Estimated Total Time:** 15-20 hours of development  
+**Target Completion:** Before October 31, 2025  
+**Last Updated:** October 19, 2025
+
+---
+
+## 📊 Progress Overview
+
+| Phase | Status | Completion | Notes |
+|-------|--------|------------|-------|
+| **Phase 1: Setup & Environment** | 🔄 In Progress | 66% (2/3) | Environment ✅, Config ✅, Testing 🔄 |
+| **Phase 2: Data Collection Tools** | ⏳ Pending | 0% | - |
+| **Phase 3: Agent Development** | ⏳ Pending | 0% | - |
+| **Phase 4: LangGraph Orchestration** | ⏳ Pending | 0% | - |
+| **Phase 5: Report Generation** | ⏳ Pending | 0% | - |
+| **Phase 6: UI Development** | ⏳ Pending | 0% | - |
+| **Phase 7: Testing & Refinement** | ⏳ Pending | 0% | - |
+
+**Current Focus:** Phase 1 Step 1.3 - Testing yfinance data acquisition
 
 ---
 
 ## Phase 1: Project Setup & Environment (1-2 hours)
 
 ### ✅ Step 1.1: Environment Setup
-**Duration:** 30 minutes
+**Duration:** 30 minutes  
+**Status:** ✅ COMPLETED on Oct 19, 2025
 
 - [x] Create organized directory structure
-- [ ] Set up Python virtual environment
-- [ ] Install core dependencies
-- [ ] Create requirements.txt
-- [ ] Set up .env file for API keys
-- [ ] Initialize git repository (optional)
+- [x] Set up Python virtual environment (`venv/`)
+- [x] Install core dependencies (all packages from requirements.txt)
+- [x] Create requirements.txt (54 packages including langchain, yfinance, groq, etc.)
+- [x] Set up .env file for API keys (template created, user needs to add Groq key)
+- [x] Initialize git repository (connected to GitHub: anirudhmb/equity-research-generator)
+
+**Notes:**
+- Using **Groq** as LLM provider (free tier, llama-3.1-70b-versatile)
+- Virtual environment activated at: `/Users/abelathur/MBA_BITS/Sem3/FM/Assignment/venv`
+- All dependencies installed successfully
+- Git configured with cross-platform support (.gitattributes, .gitignore)
 
 **Deliverables:**
 ```bash
@@ -37,25 +61,37 @@ pip install feedparser  # For news RSS feeds
 ---
 
 ### ✅ Step 1.2: Configuration Setup
-**Duration:** 30 minutes
+**Duration:** 30 minutes  
+**Status:** ✅ COMPLETED on Oct 19, 2025
 
-- [ ] Create config/settings.py
-- [ ] Set up LLM configuration (Ollama/Groq/Gemini)
-- [ ] Define Indian market constants:
-  - NIFTY 50 as benchmark (^NSEI)
-  - Indian G-Sec rate (~7.25%)
-  - NSE/BSE ticker suffixes
-- [ ] Create logging configuration
-- [ ] Set up error handling framework
+- [x] Create config/settings.py (290+ lines with full configuration management)
+- [x] Set up LLM configuration (Groq/Ollama/Gemini support)
+- [x] Define Indian market constants:
+  - NIFTY 50 as benchmark (^NSEI) ✅
+  - Indian G-Sec rate (~7.25%) ✅
+  - NSE/BSE ticker suffixes (.NS, .BO) ✅
+  - Market Risk Premium calculation ✅
+- [x] Create logging configuration (utils/logger.py with colored console + file logging)
+- [x] Set up error handling framework (validation functions, retry logic)
 
 **Deliverables:**
-- `config/settings.py` with all configurations
-- `config/env_template.txt` for optional API keys
+- ✅ `config/settings.py` with all configurations
+- ✅ `config/__init__.py` for package initialization
+- ✅ `config/env_template.txt` for optional API keys
+- ✅ `utils/logger.py` with loguru integration
+- ✅ `.env.example` template (Git-safe)
+
+**Notes:**
+- Configuration validates API keys, financial parameters, and file paths
+- Supports multiple LLM providers with easy switching
+- Indian market constants: Risk-Free=7.25%, Expected Return=13%, Premium=5.75%
+- Logger outputs to both console (colored) and file (logs/ directory)
 
 ---
 
-### ✅ Step 1.3: Test Data Acquisition
-**Duration:** 30 minutes
+### 🔄 Step 1.3: Test Data Acquisition
+**Duration:** 30 minutes  
+**Status:** 🔄 IN PROGRESS
 
 - [ ] Test yfinance API with sample ticker
 - [ ] Verify data availability for 1-2 companies
