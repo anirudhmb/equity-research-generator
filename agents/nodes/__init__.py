@@ -17,6 +17,7 @@ Each node function:
 
 from .data_collection import collect_data_node
 from .financial_analysis import analyze_node
+from .report_writing import write_report_node
 
-__all__ = ['collect_data_node', 'analyze_node']
+__all__ = ['collect_data_node', 'analyze_node', 'write_report_node']
 
