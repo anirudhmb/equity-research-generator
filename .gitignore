@@ -45,6 +45,13 @@ tags
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Windows
+*.bat
+*.exe
+*.dll
+*.pdb
 
 # Logs
 *.log

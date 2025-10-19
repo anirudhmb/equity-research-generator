@@ -2,6 +2,8 @@
 
 An AI-powered system that automatically generates comprehensive equity research reports for **Indian publicly traded companies** (NSE/BSE) using a 3-agent architecture with LangChain, LangGraph, and **free/open-source LLMs**.
 
+**🖥️ Cross-Platform:** Works on macOS, Windows, and Linux
+
 ---
 
 ## 🎯 Project Overview
@@ -134,28 +136,63 @@ Assignment/
 - **8GB+ RAM** (for local LLM with Ollama)
 - **Internet connection** (for data fetching from NSE/BSE)
 
+**Supported Platforms:** macOS, Windows 10/11, Linux
+
 ### Installation
 
-1. **Clone/Navigate to the repository**
-```bash
-cd /Users/abelathur/MBA_BITS/Sem3/FM/Assignment
-```
-
-2. **Create virtual environment**
-```bash
-python3 -m venv venv
-source venv/bin/activate  # On macOS/Linux
-```
-
-3. **Install Ollama** (Recommended - Local & Free)
+#### 1. **Clone/Navigate to the repository**
 ```bash
 # macOS/Linux
+cd /path/to/equity-research-generator
+
+# Windows
+cd C:\path\to\equity-research-generator
+```
+
+#### 2. **Create virtual environment**
+
+**macOS/Linux:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+**Windows (Command Prompt):**
+```cmd
+python -m venv venv
+venv\Scripts\activate.bat
+```
+
+**Windows (PowerShell):**
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+#### 3. **Install Ollama** (Recommended - Local & Free)
+
+**macOS:**
+```bash
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Then pull the model (choose one):
 ollama pull llama3        # Recommended - 8B model (~4.7GB)
 ollama pull mistral       # Alternative
 ollama pull gemma         # Lightweight option
+```
+
+**Windows:**
+1. Download from: https://ollama.com/download/windows
+2. Run the installer
+3. Open PowerShell/CMD and pull model:
+```powershell
+ollama pull llama3
+```
+
+**Linux:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3
 ```
 
 4. **Install dependencies**
@@ -348,6 +385,8 @@ Customize these values based on your needs.
 - [Requirements Document](docs/requirements.md) - Detailed feature requirements
 - [Architecture Document](docs/architecture.md) - System design and technical details
 - [Implementation Roadmap](docs/roadmap.md) - Step-by-step development plan
+- [Cross-Platform Setup](docs/CROSS_PLATFORM_SETUP.md) - Windows & macOS compatibility guide
+- [Indian Markets Setup](docs/INDIAN_MARKETS_SETUP.md) - NSE/BSE specific guide
 
 ---
 
