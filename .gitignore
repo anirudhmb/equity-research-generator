@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyd
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+*.egg-info/
+build/
+dist/
+_build/
+
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/
+
+# Data files
+data/*/
+*.csv
+*.xlsx
+*.xls
+*.pkl
+*.hd5
+
+# Output files
+outputs/*/
+*.docx
+*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim
+.nvimrc
+tags
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+mlruns/
+
+# Environment variables
+.env
+.env.local
+
+# API Keys
+api_keys.json
+secrets.json
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+.output
+.data
+
+# Testing
+test-output.xml
+.pytest_cache/
+.mypy_cache/
+
+# Aider
+.aider*
+
