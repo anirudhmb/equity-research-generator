@@ -286,10 +286,10 @@ print(nifty.history(period="5y"))
 
 ### ✅ Step 2.4: News & Research Tools
 **Duration:** 1.5 hours  
-**Status:** ✅ COMPLETED on Oct 19, 2025
+**Status:** ✅ COMPLETED + ENHANCED on Oct 19, 2025
 
 **Files Created:**
-- ✅ `tools/news_scraper.py` (400+ lines with news aggregation)
+- ✅ `tools/news_scraper.py` (576 lines with news aggregation & timeline analysis)
 
 **Functions Implemented:**
 ```python
@@ -305,41 +305,71 @@ print(nifty.history(period="5y"))
    
 ✅ 3. fetch_all_news(company_name, ticker, months)
    - Combines all news sources
-   - Deduplication
+   - FUZZY deduplication (85% similarity threshold)
    - Sorting by date
+   - Date range analysis
    
 ✅ 4. categorize_news(news_df)
    - 6 categories: Financial, Products, Management, Regulatory, Market Trends, M&A
    - Keyword-based classification
    
-✅ 5. get_recent_developments_summary(news_df, limit)
+✅ 5. get_news_timeline(news_df)
+   - Timeline distribution analysis
+   - Monthly/weekly breakdown
+   - Source breakdown
+   - Average articles per week
+   
+✅ 6. get_recent_developments_summary(news_df, limit)
    - Extract most recent articles
    - For report generation
    
-✅ 6. save_news_to_csv(news_df, ticker)
+✅ 7. save_news_to_csv(news_df, ticker)
    - Save to data directory
    - CSV format for processing
 ```
 
-**Additional Features:**
-- Automatic deduplication of similar articles
+**Advanced Features:**
+- ✅ **Fuzzy Deduplication** using SequenceMatcher (85% similarity)
+  - Catches same story from different sources
+  - Handles headlines with minor wording differences
+  - Keeps newest article when duplicates detected
+- ✅ **Timeline Analysis** with distribution metrics
+  - Date range and duration calculation
+  - Monthly and weekly distribution
+  - Source breakdown statistics
+  - Average articles per week
+- ✅ **RSS Feed Limitation Handling**
+  - Clear warning about 2-3 month retention
+  - Actual coverage vs requested months
+  - Transparent data availability reporting
 - News categorization with 6 categories
 - Date filtering (configurable months)
 - Robust error handling for scraping failures
 - Support for multiple news sources (expandable)
 - CSV export for data persistence
 
-**Test Results (RELIANCE, 3 months):**
-- ✅ Google News: 89 articles
-- ✅ MoneyControl: 20 articles
-- ✅ Total: 109 articles
-- ✅ Categorized: Financial (76), Market Trends (10), Other (23)
+**Enhanced Test Results (RELIANCE, 12 months requested):**
+- ✅ Google News: 100 articles fetched
+- ✅ MoneyControl: 20 articles fetched
+- ✅ **Total Unique: 114 articles** (after fuzzy deduplication)
+- ✅ **Duplicates Removed: 6 articles** (5% deduplication rate)
+- ✅ **Timeline: 3.9 months** (June 25 - Oct 19, 2025)
+- ✅ **Sources: 25 different news sources** aggregated
+- ✅ **Distribution:** June (1), July (10), Aug (8), Sept (13), Oct (82)
+- ✅ **Rate:** 6.9 articles/week average
+- ✅ Categorized: Financial (82), Market Trends (8), Other (24)
 - ✅ Saved to CSV successfully
 
 **Data Sources (All FREE):**
-- ✅ Google News RSS (Primary - Most reliable)
+- ✅ Google News RSS (Primary - Most reliable, ~3-4 months retention)
 - ✅ MoneyControl (Secondary - Web scraping)
 - ✅ Expandable to Economic Times, NSE India
+
+**Important Note:**
+- Google News RSS feeds typically retain only 2-3 months of articles
+- This is a known limitation of free news sources
+- Sufficient for "Recent Developments" section of equity research reports
+- For longer historical news, paid APIs (NewsAPI, Bloomberg, etc.) would be required
 
 ---
 
