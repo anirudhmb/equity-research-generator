@@ -76,7 +76,7 @@ def fetch_company_info(ticker: str, exchange: str = "NSE") -> Dict:
         'company_name': info.get('longName', 'N/A'),
         'sector': info.get('sector', 'N/A'),
         'industry': info.get('industry', 'N/A'),
-        'market_cap': info.get('marketCap', 0),
+        'marketCap': info.get('marketCap', 0),  # Keep camelCase to match yfinance
         'market_cap_crore': info.get('marketCap', 0) / 1e7,  # Convert to crores
         'currency': info.get('currency', 'INR'),
         'website': info.get('website', 'N/A'),
