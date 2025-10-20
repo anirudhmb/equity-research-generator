@@ -49,7 +49,12 @@ def get_llm(provider: Optional[str] = None):
         >>> llm = get_llm()  # Auto-detect from environment
         >>> llm = get_llm('groq')  # Force Groq
     """
-    from config.settings import LLM_PROVIDER, GROQ_API_KEY, GEMINI_API_KEY
+    from config.settings import (
+        LLM_PROVIDER, 
+        GROQ_API_KEY, GROQ_MODEL,
+        GEMINI_API_KEY, GEMINI_MODEL,
+        OLLAMA_MODEL, OLLAMA_BASE_URL
+    )
     
     # Use explicit provider or fall back to config
     provider = provider or LLM_PROVIDER
@@ -67,12 +72,12 @@ def get_llm(provider: Optional[str] = None):
             from langchain_groq import ChatGroq
             
             llm = ChatGroq(
-                model="llama-3.1-70b-versatile",
+                model=GROQ_MODEL,
                 temperature=0.7,
                 api_key=GROQ_API_KEY,
                 max_tokens=2000
             )
-            logger.success("✅ Groq LLM configured (llama-3.1-70b-versatile)")
+            logger.success(f"✅ Groq LLM configured ({GROQ_MODEL})")
             return llm
             
         except ImportError:
@@ -91,12 +96,12 @@ def get_llm(provider: Optional[str] = None):
             from langchain_google_genai import ChatGoogleGenerativeAI
             
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model=GEMINI_MODEL,
                 temperature=0.7,
                 google_api_key=GEMINI_API_KEY,
                 max_output_tokens=2000
             )
-            logger.success("✅ Gemini LLM configured (gemini-1.5-flash)")
+            logger.success(f"✅ Gemini LLM configured ({GEMINI_MODEL})")
             return llm
             
         except ImportError:
@@ -110,10 +115,11 @@ def get_llm(provider: Optional[str] = None):
             from langchain_community.llms import Ollama
             
             llm = Ollama(
-                model="llama3.1",
+                model=OLLAMA_MODEL,
+                base_url=OLLAMA_BASE_URL,
                 temperature=0.7
             )
-            logger.success("✅ Ollama LLM configured (llama3.1 local)")
+            logger.success(f"✅ Ollama LLM configured ({OLLAMA_MODEL} at {OLLAMA_BASE_URL})")
             return llm
             
         except ImportError:
