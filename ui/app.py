@@ -72,8 +72,88 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+def show_download_section():
+    """Display download buttons and summary (persists across page refreshes)."""
+    
+    st.markdown("---")
+    st.markdown(f"## 📥 Download Reports for **{st.session_state.company_name}**")
+    
+    # Download buttons
+    st.markdown("### 📄 Your Generated Files")
+    
+    cols = st.columns(len(st.session_state.generated_files))
+    for idx, (name, path, ext) in enumerate(st.session_state.generated_files):
+        with cols[idx]:
+            try:
+                with open(path, "rb") as file:
+                    file_data = file.read()
+                    st.download_button(
+                        label=f"📄 Download {name}",
+                        data=file_data,
+                        file_name=Path(path).name,
+                        mime=f"application/{'vnd.openxmlformats-officedocument.wordprocessingml.document' if ext == 'docx' else 'vnd.openxmlformats-officedocument.spreadsheetml.sheet'}",
+                        use_container_width=True,
+                        key=f"download_{ext}_{idx}"  # Unique key for each button
+                    )
+            except FileNotFoundError:
+                st.error(f"⚠️ File not found: {Path(path).name}")
+    
+    # Report Summary
+    st.markdown("---")
+    st.markdown("### 📊 Report Summary")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**📄 Word Report Contents:**")
+        st.markdown("""
+        - Executive Summary
+        - Company Overview
+        - Financial Analysis (Ratios)
+        - Valuation Analysis (Beta, CAPM, DDM)
+        - Risk Analysis
+        - Recent Developments
+        - Investment Recommendation
+        - Appendix (Financial Statements)
+        """)
+    
+    with col2:
+        st.markdown("**📊 Excel Workbook Sheets:**")
+        st.markdown("""
+        - Summary Dashboard
+        - Financial Ratios
+        - Income Statement
+        - Balance Sheet
+        - Cash Flow
+        - Stock Prices
+        - Dividends
+        - Valuation Details
+        - News & Developments
+        """)
+    
+    # Show key metrics if available
+    if st.session_state.result_state:
+        st.markdown("---")
+        st.markdown("### 📈 Key Metrics")
+        display_key_metrics(st.session_state.result_state)
+        
+        # Show warnings if any
+        if st.session_state.result_state.get('warnings'):
+            with st.expander("⚠️ View Warnings"):
+                for warning in st.session_state.result_state['warnings']:
+                    st.warning(warning)
+
+
 def main():
     """Main Streamlit application."""
+    
+    # Initialize session state for persisting results
+    if 'generated_files' not in st.session_state:
+        st.session_state.generated_files = []
+    if 'result_state' not in st.session_state:
+        st.session_state.result_state = None
+    if 'company_name' not in st.session_state:
+        st.session_state.company_name = None
     
     # Header
     st.markdown('<h1 class="main-header">📊 Equity Research Report Generator</h1>', unsafe_allow_html=True)
@@ -144,7 +224,15 @@ def main():
             elif not generate_word and not generate_excel:
                 st.warning("⚠️ Please select at least one output format!")
             else:
+                # Clear previous results
+                st.session_state.generated_files = []
+                st.session_state.result_state = None
+                st.session_state.company_name = company_name or ticker
                 generate_report(ticker, company_name or ticker, generate_word, generate_excel)
+        
+        # Show download buttons if files were generated (persists across refreshes)
+        if st.session_state.generated_files:
+            show_download_section()
     
     # Footer
     st.markdown("---")
@@ -203,82 +291,27 @@ def generate_report(ticker: str, company_name: str, gen_word: bool, gen_excel: b
         status_text.text("📝 Generating documents...")
         progress_bar.progress(70)
         
-        output_files = []
-        
         # Generate Word report
         if gen_word:
             with st.spinner("Creating Word document..."):
                 word_path = generate_word_report(result)
-                output_files.append(("Word Report", word_path, "docx"))
+                st.session_state.generated_files.append(("Word Report", word_path, "docx"))
                 progress_bar.progress(85)
         
         # Generate Excel workbook
         if gen_excel:
             with st.spinner("Creating Excel workbook..."):
                 excel_path = generate_excel_workbook(result)
-                output_files.append(("Excel Workbook", excel_path, "xlsx"))
+                st.session_state.generated_files.append(("Excel Workbook", excel_path, "xlsx"))
                 progress_bar.progress(100)
+        
+        # Store result for metrics display
+        st.session_state.result_state = result
         
         # Success!
         status_text.text("✅ Report generation complete!")
-        
-        st.markdown("---")
         st.success("🎉 **Report Generated Successfully!**")
-        
-        # Download buttons
-        st.markdown("### 📥 Download Your Reports")
-        
-        cols = st.columns(len(output_files))
-        for idx, (name, path, ext) in enumerate(output_files):
-            with cols[idx]:
-                with open(path, "rb") as file:
-                    file_data = file.read()
-                    st.download_button(
-                        label=f"📄 Download {name}",
-                        data=file_data,
-                        file_name=Path(path).name,
-                        mime=f"application/{'vnd.openxmlformats-officedocument.wordprocessingml.document' if ext == 'docx' else 'vnd.openxmlformats-officedocument.spreadsheetml.sheet'}",
-                        use_container_width=True
-                    )
-        
-        # Display additional info
-        st.markdown("---")
-        st.markdown("### 📊 Report Summary")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**📄 Word Report Contents:**")
-            st.markdown("""
-            - Executive Summary
-            - Company Overview
-            - Financial Analysis (Ratios)
-            - Valuation Analysis (Beta, CAPM, DDM)
-            - Risk Analysis
-            - Recent Developments
-            - Investment Recommendation
-            - Appendix (Financial Statements)
-            """)
-        
-        with col2:
-            st.markdown("**📊 Excel Workbook Sheets:**")
-            st.markdown("""
-            - Summary Dashboard
-            - Financial Ratios
-            - Income Statement
-            - Balance Sheet
-            - Cash Flow
-            - Stock Prices
-            - Dividends
-            - Valuation Details
-            - News & Developments
-            """)
-        
-        # Warnings
-        if result.get('warnings'):
-            with st.expander("⚠️ View Warnings"):
-                for warning in result['warnings']:
-                    st.warning(warning)
+        st.info("📥 **Scroll down to download your reports!** They will remain available even after page refresh.")
         
     except Exception as e:
         progress_bar.progress(0)
