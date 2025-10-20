@@ -128,8 +128,8 @@ def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
             updates['errors'].append(error_msg)
             logger.error(f"❌ {error_msg}")
         else:
-            # Initialize ratio calculator
-            calculator = RatioCalculator(balance_sheet, income_statement, cash_flow)
+            # Initialize ratio calculator (order: income_statement, balance_sheet, cash_flow)
+            calculator = RatioCalculator(income_statement, balance_sheet, cash_flow)
             
             # Calculate all ratios (for most recent period)
             all_ratios = calculator.calculate_all_ratios(period=0)
