@@ -11,7 +11,7 @@ reasoning and synthesis to generate compelling narratives.
 
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 
 # Add project root to path
@@ -101,30 +101,36 @@ Cover:
 Write in an informative, analytical style."""
 
 
-FINANCIAL_ANALYSIS_PROMPT = """Write a detailed financial analysis section (4-5 paragraphs) covering ratio analysis and trends.
+FINANCIAL_ANALYSIS_PROMPT = """Write a detailed financial analysis section (4-5 paragraphs) covering ratio analysis and year-on-year trends.
 
 Company: {company_name}
 
-Liquidity Ratios:
-{liquidity_ratios}
+YEAR-ON-YEAR LIQUIDITY RATIOS:
+{liquidity_ratios_yoy}
 
-Efficiency Ratios:
-{efficiency_ratios}
+YEAR-ON-YEAR EFFICIENCY RATIOS:
+{efficiency_ratios_yoy}
 
-Solvency/Leverage Ratios:
-{solvency_ratios}
+YEAR-ON-YEAR SOLVENCY/LEVERAGE RATIOS:
+{solvency_ratios_yoy}
 
-Profitability Ratios:
-{profitability_ratios}
+YEAR-ON-YEAR PROFITABILITY RATIOS:
+{profitability_ratios_yoy}
+
+YEAR-ON-YEAR VALUATION RATIOS:
+{valuation_ratios_yoy}
 
 Analyze:
-1. Liquidity position and short-term solvency
-2. Operational efficiency and asset utilization
-3. Leverage and long-term financial stability
-4. Profitability and returns to shareholders
-5. Overall financial health assessment
+1. Liquidity position and short-term solvency - Identify improving or deteriorating trends
+2. Operational efficiency and asset utilization - Compare year-over-year changes
+3. Leverage and long-term financial stability - Assess debt management trends
+4. Profitability and returns to shareholders - Evaluate margin and return trends
+5. Valuation trends - Assess how P/E and P/B ratios have changed over time, indicating market perception
+6. Overall financial health assessment - Provide a trend-based conclusion
 
-Compare ratios to industry standards where appropriate. Highlight strengths and concerns."""
+IMPORTANT: Focus on year-on-year trends and changes. Identify which metrics are improving, stable, or deteriorating over time.
+For valuation ratios, explain what the trends mean (e.g., rising P/E could indicate growing optimism or overvaluation).
+Compare ratios to industry standards where appropriate. Highlight strengths, concerns, and notable trends."""
 
 
 VALUATION_ANALYSIS_PROMPT = """Write a detailed valuation analysis section (3-4 paragraphs).
@@ -228,6 +234,48 @@ def format_ratio_dict(ratios: Dict[str, float]) -> str:
                     lines.append(f"- {formatted_name}: {value:.2f}")
             else:
                 lines.append(f"- {formatted_name}: {value:.2f}")
+    
+    return "\n".join(lines) if lines else "No data available"
+
+
+def format_ratios_by_year(ratios_by_year: List[Dict], category: str, ratio_names: List[str]) -> str:
+    """
+    Format year-on-year ratios for a specific category.
+    
+    Args:
+        ratios_by_year: List of dicts with period, date, and ratios
+        category: Category name (liquidity, efficiency, solvency, profitability)
+        ratio_names: List of ratio names to include
+    
+    Returns:
+        Formatted string showing year-on-year comparison
+    """
+    if not ratios_by_year:
+        return "No historical data available"
+    
+    lines = []
+    
+    # Extract years from dates (most recent first)
+    years = [year_data.get('date', '')[:4] for year_data in ratios_by_year]
+    
+    for ratio_name in ratio_names:
+        formatted_name = ratio_name.replace('_', ' ').title()
+        values = []
+        
+        for year_data in ratios_by_year:
+            ratio_value = year_data.get('ratios', {}).get(ratio_name)
+            if ratio_value is not None:
+                # Format based on ratio type
+                if 'margin' in ratio_name or 'return' in ratio_name:
+                    values.append(f"{ratio_value:.2f}%")
+                else:
+                    values.append(f"{ratio_value:.2f}")
+            else:
+                values.append("N/A")
+        
+        # Create year-on-year line
+        year_values = " | ".join([f"FY{year}: {val}" for year, val in zip(years, values)])
+        lines.append(f"- {formatted_name}: {year_values}")
     
     return "\n".join(lines) if lines else "No data available"
 
@@ -486,13 +534,47 @@ def write_report_node(state: EquityResearchState) -> Dict[str, Any]:
             ("human", FINANCIAL_ANALYSIS_PROMPT)
         ])
         
-        financial_vars = {
-            'company_name': common_vars['company_name'],
-            'liquidity_ratios': format_ratio_dict(ratios.get('liquidity', {})),
-            'efficiency_ratios': format_ratio_dict(ratios.get('efficiency', {})),
-            'solvency_ratios': format_ratio_dict(ratios.get('solvency', {})),
-            'profitability_ratios': format_ratio_dict(ratios.get('profitability', {})),
-        }
+        # Use year-on-year data if available, fallback to single-period
+        ratios_by_year = state.get('ratios_by_year', [])
+        
+        if ratios_by_year:
+            # Format year-on-year ratios for the LLM
+            financial_vars = {
+                'company_name': common_vars['company_name'],
+                'liquidity_ratios_yoy': format_ratios_by_year(
+                    ratios_by_year, 'liquidity', 
+                    ['current_ratio', 'quick_ratio', 'cash_ratio']
+                ),
+                'efficiency_ratios_yoy': format_ratios_by_year(
+                    ratios_by_year, 'efficiency',
+                    ['asset_turnover', 'inventory_turnover', 'receivables_turnover', 'days_sales_outstanding']
+                ),
+                'solvency_ratios_yoy': format_ratios_by_year(
+                    ratios_by_year, 'solvency',
+                    ['debt_to_equity', 'debt_ratio', 'interest_coverage', 'equity_multiplier']
+                ),
+                'profitability_ratios_yoy': format_ratios_by_year(
+                    ratios_by_year, 'profitability',
+                    ['gross_profit_margin', 'operating_profit_margin', 'net_profit_margin', 
+                     'return_on_assets', 'return_on_equity', 'return_on_invested_capital']
+                ),
+                'valuation_ratios_yoy': format_ratios_by_year(
+                    ratios_by_year, 'valuation',
+                    ['pe_ratio', 'pb_ratio', 'dividend_yield']
+                ),
+            }
+            logger.info(f"   Using year-on-year ratio data ({len(ratios_by_year)} periods)")
+        else:
+            # Fallback to single-period data (backward compatibility)
+            financial_vars = {
+                'company_name': common_vars['company_name'],
+                'liquidity_ratios_yoy': format_ratio_dict(ratios.get('liquidity', {})),
+                'efficiency_ratios_yoy': format_ratio_dict(ratios.get('efficiency', {})),
+                'solvency_ratios_yoy': format_ratio_dict(ratios.get('solvency', {})),
+                'profitability_ratios_yoy': format_ratio_dict(ratios.get('profitability', {})),
+                'valuation_ratios_yoy': "No year-on-year valuation data available",
+            }
+            logger.warning("   Using single-period ratio data (year-on-year not available)")
         
         chain = financial_prompt | llm
         response = chain.invoke(financial_vars)

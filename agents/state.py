@@ -182,6 +182,7 @@ class EquityResearchState(TypedDict, total=False):
     
     # === FINANCIAL ANALYSIS NODE OUTPUT ===
     ratios: Optional[Dict[str, Dict[str, List[float]]]]
+    ratios_by_year: Optional[List[Dict[str, Any]]]  # Year-on-year ratio comparison
     ratio_trends: Optional[Dict[str, Dict[str, Any]]]
     beta: Optional[float]
     correlation_with_market: Optional[float]
@@ -245,6 +246,7 @@ def create_initial_state(ticker: str, company_name: Optional[str] = None) -> Equ
         news_timeline=None,
         data_quality_score=None,
         ratios=None,
+        ratios_by_year=None,
         ratio_trends=None,
         beta=None,
         correlation_with_market=None,

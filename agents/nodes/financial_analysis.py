@@ -128,52 +128,70 @@ def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
             updates['errors'].append(error_msg)
             logger.error(f"❌ {error_msg}")
         else:
-            # Initialize ratio calculator (order: income_statement, balance_sheet, cash_flow)
-            calculator = RatioCalculator(income_statement, balance_sheet, cash_flow)
+            # Initialize ratio calculator (order: income_statement, balance_sheet, cash_flow, stock_prices)
+            calculator = RatioCalculator(income_statement, balance_sheet, cash_flow, stock_prices)
+            
+            # Get number of available periods for year-on-year analysis
+            num_periods = min(len(income_statement.columns), len(balance_sheet.columns))
+            logger.info(f"   Available periods for analysis: {num_periods}")
             
             # Calculate all ratios (for most recent period)
-            all_ratios = calculator.calculate_all_ratios(period=0)
+            all_ratios_latest = calculator.calculate_all_ratios(period=0)
+            
+            # Calculate year-on-year ratios for all available periods
+            ratios_by_year = []
+            for period in range(num_periods):
+                period_ratios = calculator.calculate_all_ratios(period)
+                # Get period date from financial statement columns
+                period_date = income_statement.columns[period].strftime('%Y-%m-%d') if hasattr(income_statement.columns[period], 'strftime') else str(income_statement.columns[period])
+                ratios_by_year.append({
+                    'period': period,
+                    'date': period_date,
+                    'ratios': period_ratios
+                })
             
             # Get trend analysis (across multiple periods)
             try:
-                trends_df = calculator.calculate_ratio_trends(periods=3)
+                trends_df = calculator.calculate_ratio_trends(periods=num_periods)
                 # Convert to dict format for easier storage
                 trends = trends_df.to_dict()
             except Exception as e:
                 logger.warning(f"Could not calculate trends: {e}")
                 trends = {}
             
-            # Group ratios by category for easier reporting
+            # Group ratios by category for MOST RECENT period (for summary display)
             ratios_by_category = {
                 'liquidity': {
-                    'current_ratio': all_ratios.get('current_ratio'),
-                    'quick_ratio': all_ratios.get('quick_ratio'),
-                    'cash_ratio': all_ratios.get('cash_ratio')
+                    'current_ratio': all_ratios_latest.get('current_ratio'),
+                    'quick_ratio': all_ratios_latest.get('quick_ratio'),
+                    'cash_ratio': all_ratios_latest.get('cash_ratio')
                 },
                 'efficiency': {
-                    'asset_turnover': all_ratios.get('asset_turnover'),
-                    'inventory_turnover': all_ratios.get('inventory_turnover'),
-                    'receivables_turnover': all_ratios.get('receivables_turnover'),
-                    'days_sales_outstanding': all_ratios.get('days_sales_outstanding')
+                    'asset_turnover': all_ratios_latest.get('asset_turnover'),
+                    'inventory_turnover': all_ratios_latest.get('inventory_turnover'),
+                    'receivables_turnover': all_ratios_latest.get('receivables_turnover'),
+                    'days_sales_outstanding': all_ratios_latest.get('days_sales_outstanding')
                 },
                 'solvency': {
-                    'debt_to_equity': all_ratios.get('debt_to_equity'),
-                    'debt_ratio': all_ratios.get('debt_ratio'),
-                    'interest_coverage': all_ratios.get('interest_coverage'),
-                    'equity_multiplier': all_ratios.get('equity_multiplier')
+                    'debt_to_equity': all_ratios_latest.get('debt_to_equity'),
+                    'debt_ratio': all_ratios_latest.get('debt_ratio'),
+                    'interest_coverage': all_ratios_latest.get('interest_coverage'),
+                    'equity_multiplier': all_ratios_latest.get('equity_multiplier')
                 },
                 'profitability': {
-                    'gross_profit_margin': all_ratios.get('gross_profit_margin'),
-                    'operating_profit_margin': all_ratios.get('operating_profit_margin'),
-                    'net_profit_margin': all_ratios.get('net_profit_margin'),
-                    'return_on_assets': all_ratios.get('return_on_assets'),
-                    'return_on_equity': all_ratios.get('return_on_equity'),
-                    'return_on_invested_capital': all_ratios.get('return_on_invested_capital')
+                    'gross_profit_margin': all_ratios_latest.get('gross_profit_margin'),
+                    'operating_profit_margin': all_ratios_latest.get('operating_profit_margin'),
+                    'net_profit_margin': all_ratios_latest.get('net_profit_margin'),
+                    'return_on_assets': all_ratios_latest.get('return_on_assets'),
+                    'return_on_equity': all_ratios_latest.get('return_on_equity'),
+                    'return_on_invested_capital': all_ratios_latest.get('return_on_invested_capital')
                 }
             }
             
-            updates['ratios'] = ratios_by_category
-            updates['ratio_trends'] = trends
+            # Store both latest ratios and year-on-year data
+            updates['ratios'] = ratios_by_category  # Most recent period for summary
+            updates['ratios_by_year'] = ratios_by_year  # All periods for detailed analysis
+            updates['ratio_trends'] = trends  # Trends DataFrame
             
             logger.success("✅ Financial ratios calculated successfully!")
             
@@ -183,8 +201,8 @@ def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
                 logger.info(f"   {category.capitalize()}: {available}/{len(ratios_dict)} ratios")
             
             # Show a sample ratio
-            if all_ratios.get('current_ratio') is not None:
-                logger.info(f"   Sample - Current Ratio: {all_ratios['current_ratio']:.2f}")
+            if all_ratios_latest.get('current_ratio') is not None:
+                logger.info(f"   Sample - Current Ratio: {all_ratios_latest['current_ratio']:.2f}")
             
     except Exception as e:
         error_msg = f"Ratio calculation error: {str(e)}"

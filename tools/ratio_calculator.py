@@ -31,7 +31,7 @@ class RatioCalculator:
     """
     
     def __init__(self, income_statement: pd.DataFrame, balance_sheet: pd.DataFrame, 
-                 cash_flow: pd.DataFrame = None):
+                 cash_flow: pd.DataFrame = None, stock_prices: pd.DataFrame = None):
         """
         Initialize ratio calculator with financial statements.
         
@@ -39,10 +39,12 @@ class RatioCalculator:
             income_statement: Income statement DataFrame (columns = periods)
             balance_sheet: Balance sheet DataFrame (columns = periods)
             cash_flow: Cash flow statement DataFrame (optional)
+            stock_prices: Historical stock prices DataFrame (optional, for valuation ratios)
         """
         self.income_stmt = income_statement
         self.balance_sheet = balance_sheet
         self.cash_flow = cash_flow if cash_flow is not None else pd.DataFrame()
+        self.stock_prices = stock_prices if stock_prices is not None else pd.DataFrame()
         
         # Common field name variations in yfinance data
         self.field_mappings = self._create_field_mappings()
@@ -81,6 +83,14 @@ class RatioCalculator:
                            'Total Stockholder Equity', 'Shareholders Equity', 'Total Equity'],
             'shareholders_equity': ['Stockholders Equity', 'Total Stockholder Equity', 
                                    'Shareholders Equity', 'Total Equity Gross Minority Interest'],
+            'ordinary_shares_number': ['Ordinary Shares Number', 'Share Issued', 'Shares Outstanding', 'Common Stock Shares Outstanding'],
+            
+            # Shares (can be in Income Statement or Balance Sheet)
+            'diluted_average_shares': ['Diluted Average Shares', 'Diluted Shares Outstanding', 'Basic Average Shares', 'Weighted Average Shares'],
+            
+            # Cash Flow
+            'cash_dividends_paid': ['Cash Dividends Paid', 'Dividends Paid', 'Cash Dividends Paid CFF'],
+            'dividends_paid': ['Dividends Paid', 'Cash Dividends Paid', 'Common Stock Dividend Paid'],
         }
     
     def _get_value(self, statement: pd.DataFrame, field_name: str, period: int = 0) -> Optional[float]:
@@ -537,6 +547,182 @@ class RatioCalculator:
         
         return None
     
+    # ==================== VALUATION RATIOS ====================
+    
+    def pe_ratio(self, period: int = 0) -> Optional[float]:
+        """
+        Calculate Price-to-Earnings (P/E) ratio.
+        Uses stock price at fiscal year-end date.
+        
+        Formula: P/E = Price per Share / Earnings per Share
+        
+        Args:
+            period: Period index (0 = most recent)
+        
+        Returns:
+            P/E ratio or None
+        """
+        # Get EPS from income statement
+        net_income = self._get_value(self.income_stmt, 'net_income', period)
+        shares_outstanding = self._get_value(self.income_stmt, 'diluted_average_shares', period)
+        
+        if not net_income or not shares_outstanding or shares_outstanding == 0:
+            return None
+        
+        eps = net_income / shares_outstanding
+        
+        if eps <= 0:  # P/E not meaningful for negative earnings
+            return None
+        
+        # Get fiscal year-end date from financial statement
+        fiscal_date = self.income_stmt.columns[period]
+        
+        # Match stock price to fiscal year-end date
+        price = self._get_price_at_date(fiscal_date)
+        
+        if price and price > 0:
+            pe = price / eps
+            logger.debug(f"P/E Ratio (Period {period}, Date: {fiscal_date}): {pe:.2f}")
+            return pe
+        
+        return None
+    
+    def pb_ratio(self, period: int = 0) -> Optional[float]:
+        """
+        Calculate Price-to-Book (P/B) ratio.
+        Uses stock price at fiscal year-end date.
+        
+        Formula: P/B = Price per Share / Book Value per Share
+        
+        Args:
+            period: Period index (0 = most recent)
+        
+        Returns:
+            P/B ratio or None
+        """
+        # Get book value from balance sheet
+        total_equity = self._get_value(self.balance_sheet, 'total_equity', period)
+        shares_outstanding = self._get_value(self.balance_sheet, 'ordinary_shares_number', period)
+        
+        # Try alternate share count from income statement if not in balance sheet
+        if not shares_outstanding:
+            shares_outstanding = self._get_value(self.income_stmt, 'diluted_average_shares', period)
+        
+        if not total_equity or not shares_outstanding or shares_outstanding == 0:
+            return None
+        
+        book_value_per_share = total_equity / shares_outstanding
+        
+        if book_value_per_share <= 0:  # P/B not meaningful for negative equity
+            return None
+        
+        # Get fiscal year-end date from financial statement
+        fiscal_date = self.balance_sheet.columns[period]
+        
+        # Match stock price to fiscal year-end date
+        price = self._get_price_at_date(fiscal_date)
+        
+        if price and price > 0:
+            pb = price / book_value_per_share
+            logger.debug(f"P/B Ratio (Period {period}, Date: {fiscal_date}): {pb:.2f}")
+            return pb
+        
+        return None
+    
+    def dividend_yield(self, period: int = 0) -> Optional[float]:
+        """
+        Calculate Dividend Yield.
+        Uses stock price at fiscal year-end date.
+        
+        Formula: Dividend Yield = (Dividends per Share / Price per Share) * 100
+        
+        Args:
+            period: Period index (0 = most recent)
+        
+        Returns:
+            Dividend yield (as percentage) or None
+        """
+        # Get dividends for the period from cash flow statement
+        # Try multiple field names for dividends
+        dividends_paid = self._get_value(self.cash_flow, 'cash_dividends_paid', period)
+        if not dividends_paid:
+            dividends_paid = self._get_value(self.cash_flow, 'dividends_paid', period)
+        
+        # Get shares outstanding
+        shares_outstanding = self._get_value(self.income_stmt, 'diluted_average_shares', period)
+        
+        if not dividends_paid or not shares_outstanding or shares_outstanding == 0:
+            return None
+        
+        # Calculate dividends per share
+        dividends_per_share = abs(dividends_paid) / shares_outstanding  # abs() because dividends are often negative in cash flow
+        
+        # Get fiscal year-end date
+        fiscal_date = self.income_stmt.columns[period]
+        
+        # Match stock price to fiscal year-end date
+        price = self._get_price_at_date(fiscal_date)
+        
+        if price and price > 0:
+            dividend_yield = (dividends_per_share / price) * 100  # As percentage
+            logger.debug(f"Dividend Yield (Period {period}, Date: {fiscal_date}): {dividend_yield:.2f}%")
+            return dividend_yield
+        
+        return None
+    
+    def _get_price_at_date(self, target_date) -> Optional[float]:
+        """
+        Get stock price closest to the target date (fiscal year-end).
+        
+        Args:
+            target_date: Target date (fiscal year-end)
+        
+        Returns:
+            Stock price or None
+        """
+        if self.stock_prices is None or self.stock_prices.empty:
+            return None
+        
+        try:
+            # Convert target date to datetime if it's a string
+            if isinstance(target_date, str):
+                target_date = pd.to_datetime(target_date)
+            
+            # Ensure stock_prices index is datetime
+            if not isinstance(self.stock_prices.index, pd.DatetimeIndex):
+                self.stock_prices.index = pd.to_datetime(self.stock_prices.index)
+            
+            # Handle timezone awareness - localize target_date if stock_prices index is timezone-aware
+            if self.stock_prices.index.tz is not None and target_date.tz is None:
+                target_date = target_date.tz_localize(self.stock_prices.index.tz)
+            elif self.stock_prices.index.tz is None and hasattr(target_date, 'tz') and target_date.tz is not None:
+                target_date = target_date.tz_localize(None)
+            
+            # Find the closest date in stock prices
+            # Look within ±30 days of fiscal year-end
+            mask = (self.stock_prices.index >= target_date - pd.Timedelta(days=30)) & \
+                   (self.stock_prices.index <= target_date + pd.Timedelta(days=30))
+            
+            matching_prices = self.stock_prices[mask]
+            
+            if matching_prices.empty:
+                logger.warning(f"No stock price found near {target_date}")
+                return None
+            
+            # Get the closest date
+            # Use abs() function instead of .abs() method for compatibility with newer pandas
+            time_deltas = abs(matching_prices.index - target_date)
+            closest_idx = time_deltas.argmin()
+            closest_date = matching_prices.index[closest_idx]
+            price = matching_prices.iloc[closest_idx]['Close']
+            
+            logger.debug(f"Matched price ₹{price:.2f} on {closest_date} for target {target_date}")
+            return float(price)
+            
+        except Exception as e:
+            logger.warning(f"Error getting price at {target_date}: {e}")
+            return None
+    
     # ==================== COMPREHENSIVE ANALYSIS ====================
     
     def calculate_all_ratios(self, period: int = 0) -> Dict[str, Optional[float]]:
@@ -576,6 +762,11 @@ class RatioCalculator:
             'return_on_assets': self.return_on_assets(period),
             'return_on_equity': self.return_on_equity(period),
             'return_on_invested_capital': self.return_on_invested_capital(period),
+            
+            # Valuation
+            'pe_ratio': self.pe_ratio(period),
+            'pb_ratio': self.pb_ratio(period),
+            'dividend_yield': self.dividend_yield(period),
         }
         
         # Count available ratios

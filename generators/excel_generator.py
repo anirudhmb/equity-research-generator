@@ -211,71 +211,139 @@ def _add_summary_sheet(wb: Workbook, state: EquityResearchState):
 
 
 def _add_ratios_sheet(wb: Workbook, state: EquityResearchState):
-    """Add financial ratios sheet."""
+    """Add financial ratios sheet with year-on-year comparison."""
     ws = wb.create_sheet("Financial Ratios")
     
-    ratios = state.get('ratios', {})
+    ratios_by_year = state.get('ratios_by_year', [])
+    ratios = state.get('ratios', {})  # Fallback to latest period
     
-    if not ratios:
+    if not ratios_by_year and not ratios:
         ws['A1'] = "No ratio data available"
         return
     
     # Title
-    ws['A1'] = "FINANCIAL RATIOS ANALYSIS"
+    ws['A1'] = "FINANCIAL RATIOS ANALYSIS (Year-on-Year)"
     ws['A1'].font = Font(bold=True, size=14, color="366092")
-    ws.merge_cells('A1:C1')
     
-    row = 3
+    # If we have year-on-year data, show multi-period comparison
+    if ratios_by_year:
+        # Merge title across all columns
+        num_periods = len(ratios_by_year)
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=num_periods + 1)
+        
+        # Add column headers (dates)
+        ws.cell(row=3, column=1, value="Ratio").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=3, column=1).fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        
+        for idx, year_data in enumerate(ratios_by_year):
+            col = idx + 2
+            # Extract year from date (e.g., "2024-03-31" -> "FY 2024")
+            date_str = year_data.get('date', '')
+            year = date_str[:4] if date_str else f"Period {idx}"
+            ws.cell(row=3, column=col, value=f"FY {year}").font = Font(bold=True, color="FFFFFF")
+            ws.cell(row=3, column=col).fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            ws.cell(row=3, column=col).alignment = Alignment(horizontal="center")
+        
+        row = 4
+        
+        # Define ratio categories
+        categories = [
+            ('LIQUIDITY RATIOS', ['current_ratio', 'quick_ratio', 'cash_ratio']),
+            ('EFFICIENCY RATIOS', ['asset_turnover', 'inventory_turnover', 'receivables_turnover', 'days_sales_outstanding']),
+            ('SOLVENCY/LEVERAGE RATIOS', ['debt_to_equity', 'debt_ratio', 'interest_coverage', 'equity_multiplier']),
+            ('PROFITABILITY RATIOS', ['gross_profit_margin', 'operating_profit_margin', 'net_profit_margin', 'return_on_assets', 'return_on_equity', 'return_on_invested_capital']),
+            ('VALUATION RATIOS', ['pe_ratio', 'pb_ratio', 'dividend_yield'])
+        ]
+        
+        for category_name, ratio_names in categories:
+            # Category header
+            ws.cell(row=row, column=1, value=category_name).font = Font(bold=True, size=11, color="366092")
+            row += 1
+            
+            # Add ratios for this category
+            for ratio_name in ratio_names:
+                ws.cell(row=row, column=1, value=ratio_name.replace('_', ' ').title())
+                
+                # Add values for each period
+                for idx, year_data in enumerate(ratios_by_year):
+                    col = idx + 2
+                    ratio_value = year_data.get('ratios', {}).get(ratio_name)
+                    
+                    if ratio_value is not None:
+                        # Format percentage ratios
+                        if 'margin' in ratio_name or 'return' in ratio_name:
+                            ws.cell(row=row, column=col, value=f"{ratio_value:.2f}%")
+                        else:
+                            ws.cell(row=row, column=col, value=f"{ratio_value:.2f}")
+                        ws.cell(row=row, column=col).alignment = Alignment(horizontal="right")
+                    else:
+                        ws.cell(row=row, column=col, value="N/A")
+                        ws.cell(row=row, column=col).alignment = Alignment(horizontal="center")
+                
+                row += 1
+            
+            row += 1  # Blank row between categories
+        
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 35
+        for idx in range(num_periods):
+            col_letter = chr(66 + idx)  # B, C, D, etc.
+            ws.column_dimensions[col_letter].width = 15
     
-    # Liquidity Ratios
-    ws.cell(row=row, column=1, value="LIQUIDITY RATIOS")
-    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
-    row += 1
-    
-    for name, value in ratios.get('liquidity', {}).items():
-        ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
-        ws.cell(row=row, column=2, value=f"{value:.2f}" if value is not None else "N/A")
+    else:
+        # Fallback to single-period display (old format)
+        ws.merge_cells('A1:C1')
+        row = 3
+        
+        # Liquidity Ratios
+        ws.cell(row=row, column=1, value="LIQUIDITY RATIOS")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
         row += 1
-    
-    row += 1
-    
-    # Efficiency Ratios
-    ws.cell(row=row, column=1, value="EFFICIENCY RATIOS")
-    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
-    row += 1
-    
-    for name, value in ratios.get('efficiency', {}).items():
-        ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
-        ws.cell(row=row, column=2, value=f"{value:.2f}" if value is not None else "N/A")
+        
+        for name, value in ratios.get('liquidity', {}).items():
+            ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
+            ws.cell(row=row, column=2, value=f"{value:.2f}" if value is not None else "N/A")
+            row += 1
+        
         row += 1
-    
-    row += 1
-    
-    # Solvency Ratios
-    ws.cell(row=row, column=1, value="SOLVENCY/LEVERAGE RATIOS")
-    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
-    row += 1
-    
-    for name, value in ratios.get('solvency', {}).items():
-        ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
-        ws.cell(row=row, column=2, value=f"{value:.2f}" if value is not None else "N/A")
+        
+        # Efficiency Ratios
+        ws.cell(row=row, column=1, value="EFFICIENCY RATIOS")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
         row += 1
-    
-    row += 1
-    
-    # Profitability Ratios
-    ws.cell(row=row, column=1, value="PROFITABILITY RATIOS")
-    ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
-    row += 1
-    
-    for name, value in ratios.get('profitability', {}).items():
-        ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
-        ws.cell(row=row, column=2, value=f"{value:.2f}%" if value is not None and ('margin' in name or 'return' in name) else f"{value:.2f}" if value is not None else "N/A")
+        
+        for name, value in ratios.get('efficiency', {}).items():
+            ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
+            ws.cell(row=row, column=2, value=f"{value:.2f}" if value is not None else "N/A")
+            row += 1
+        
         row += 1
-    
-    # Adjust column widths
-    ws.column_dimensions['A'].width = 30
-    ws.column_dimensions['B'].width = 15
+        
+        # Solvency Ratios
+        ws.cell(row=row, column=1, value="SOLVENCY/LEVERAGE RATIOS")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
+        row += 1
+        
+        for name, value in ratios.get('solvency', {}).items():
+            ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
+            ws.cell(row=row, column=2, value=f"{value:.2f}" if value is not None else "N/A")
+            row += 1
+        
+        row += 1
+        
+        # Profitability Ratios
+        ws.cell(row=row, column=1, value="PROFITABILITY RATIOS")
+        ws.cell(row=row, column=1).font = Font(bold=True, size=12, color="366092")
+        row += 1
+        
+        for name, value in ratios.get('profitability', {}).items():
+            ws.cell(row=row, column=1, value=name.replace('_', ' ').title())
+            ws.cell(row=row, column=2, value=f"{value:.2f}%" if value is not None and ('margin' in name or 'return' in name) else f"{value:.2f}" if value is not None else "N/A")
+            row += 1
+        
+        # Adjust column widths
+        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['B'].width = 15
 
 
 def _add_income_statement_sheet(wb: Workbook, state: EquityResearchState):
