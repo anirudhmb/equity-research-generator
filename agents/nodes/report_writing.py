@@ -133,7 +133,7 @@ For valuation ratios, explain what the trends mean (e.g., rising P/E could indic
 Compare ratios to industry standards where appropriate. Highlight strengths, concerns, and notable trends."""
 
 
-VALUATION_ANALYSIS_PROMPT = """Write a detailed valuation analysis section (3-4 paragraphs).
+VALUATION_ANALYSIS_PROMPT = """Write a comprehensive valuation analysis section (4-5 paragraphs) covering multiple valuation methods.
 
 Company: {company_name}
 Current Price: ₹{current_price}
@@ -143,23 +143,38 @@ Beta & Risk Metrics:
 - Correlation with NIFTY 50: {correlation}
 - Cost of Equity (CAPM): {cost_of_equity}%
 
-DDM Valuation:
-- Current Dividend (D0): ₹{current_dividend}
-- Next Dividend (D1): ₹{next_dividend}
-- Growth Rate: {growth_rate}%
-- Fair Value: ₹{fair_value}
-- Upside/Downside: {upside_downside}%
+WACC (Weighted Average Cost of Capital):
+{wacc_data}
+
+DDM Valuation (Dividend Discount Model):
+{ddm_data}
+
+DCF - FCF Valuation (Free Cash Flow to Firm):
+{fcf_dcf_data}
+
+DCF - FCFE Valuation (Free Cash Flow to Equity):
+{fcfe_dcf_data}
+
+VALUATION COMPARISON:
+{valuation_comparison}
 
 Recommendation: {recommendation}
 
 Analyze:
 1. Beta and systematic risk relative to market
-2. Cost of equity and required return
-3. DDM assumptions and valuation methodology
-4. Fair value vs current price comparison
-5. Investment recommendation with rationale
+2. Cost of equity and WACC - what do they tell us?
+3. DDM methodology, assumptions, and fair value (if applicable)
+4. FCF DCF methodology - enterprise value approach, key assumptions
+5. FCFE DCF methodology - equity value approach, key assumptions
+6. Compare all valuation methods - which is most reliable for this company and why?
+7. Fair value consensus vs current price - investment opportunity analysis
+8. Final investment recommendation with multi-method rationale
 
-Discuss limitations of DDM for this company if applicable."""
+IMPORTANT: 
+- If DDM is not applicable (non-dividend paying), emphasize the DCF methods
+- Explain why different methods give different valuations (assumptions, methodologies)
+- Provide a weighted or consensus view of fair value if multiple methods are applicable
+- Discuss limitations and strengths of each method for THIS specific company"""
 
 
 RISK_ANALYSIS_PROMPT = """Write a risk analysis section (3-4 paragraphs) covering key investment risks.
@@ -308,6 +323,95 @@ def format_news_categories(news_categorized: Dict) -> str:
             lines.append(f"- {category.title()}: {len(articles)} articles")
     
     return "\n".join(lines) if lines else "No categorized news available"
+
+
+def format_wacc_data(wacc: Dict) -> str:
+    """Format WACC data for LLM prompt."""
+    if not wacc:
+        return "WACC not calculated (missing data)"
+    
+    lines = [
+        f"- WACC: {wacc.get('wacc', 0):.2%}",
+        f"- Cost of Equity: {wacc.get('cost_of_equity', 0):.2%}",
+        f"- Cost of Debt (After-Tax): {wacc.get('cost_of_debt_after_tax', 0):.2%}",
+        f"- Weight of Equity (E/V): {wacc.get('weight_equity', 0):.1%}",
+        f"- Weight of Debt (D/V): {wacc.get('weight_debt', 0):.1%}",
+        f"- Tax Rate: {wacc.get('tax_rate', 0):.1%}"
+    ]
+    return "\n".join(lines)
+
+
+def format_dcf_data(dcf: Dict, method_name: str) -> str:
+    """Format DCF valuation data for LLM prompt."""
+    if not dcf or not dcf.get('applicable'):
+        reason = dcf.get('reason', 'Data not available') if dcf else 'Data not available'
+        return f"{method_name} not applicable: {reason}"
+    
+    lines = [
+        f"- Method: {dcf.get('method', method_name)}",
+        f"- Growth Rate: {dcf.get('fcf_growth_rate', dcf.get('fcfe_growth_rate', 0)):.2%}",
+        f"- Terminal Growth Rate: {dcf.get('terminal_growth_rate', 0):.2%}",
+    ]
+    
+    if 'wacc' in dcf:
+        lines.append(f"- Discount Rate (WACC): {dcf.get('wacc', 0):.2%}")
+        lines.append(f"- Enterprise Value: ₹{dcf.get('enterprise_value', 0):,.0f} Cr")
+        lines.append(f"- Net Debt: ₹{dcf.get('net_debt', 0):,.0f} Cr")
+    else:
+        lines.append(f"- Discount Rate (Cost of Equity): {dcf.get('cost_of_equity', 0):.2%}")
+    
+    lines.append(f"- Equity Value: ₹{dcf.get('equity_value', 0):,.0f} Cr")
+    lines.append(f"- Fair Value per Share: ₹{dcf.get('fair_value_per_share', 0):.2f}")
+    lines.append(f"- Upside/Downside: {dcf.get('upside_downside', 0):.1%}")
+    lines.append(f"- Recommendation: {dcf.get('recommendation', 'N/A')}")
+    
+    return "\n".join(lines)
+
+
+def format_ddm_data(ddm: Dict) -> str:
+    """Format DDM valuation data for LLM prompt."""
+    if not ddm or not ddm.get('applicable'):
+        reason = ddm.get('reason', 'Company does not pay dividends') if ddm else 'Company does not pay dividends'
+        return f"DDM not applicable: {reason}"
+    
+    lines = [
+        f"- Current Dividend (D0): ₹{ddm.get('d0_current_dividend', 0):.2f}",
+        f"- Next Dividend (D1): ₹{ddm.get('d1_next_dividend', 0):.2f}",
+        f"- Growth Rate: {ddm.get('growth_rate', 0):.2%}",
+        f"- Cost of Equity: {ddm.get('cost_of_equity', 0):.2%}",
+        f"- Fair Value: ₹{ddm.get('fair_value', 0):.2f}",
+        f"- Upside/Downside: {ddm.get('upside_downside', 0):.1%}",
+        f"- Recommendation: {ddm.get('recommendation', 'N/A')}"
+    ]
+    return "\n".join(lines)
+
+
+def format_valuation_comparison(ddm: Dict, fcf_dcf: Dict, fcfe_dcf: Dict, current_price: float) -> str:
+    """Format valuation comparison table for LLM prompt."""
+    lines = ["Method | Fair Value | Upside/Downside | Recommendation"]
+    lines.append("-" * 70)
+    
+    if ddm and ddm.get('applicable'):
+        fv = ddm.get('fair_value', 0)
+        upside = ddm.get('upside_downside', 0)
+        rec = ddm.get('recommendation', 'N/A')
+        lines.append(f"DDM | ₹{fv:.2f} | {upside:.1%} | {rec}")
+    
+    if fcf_dcf and fcf_dcf.get('applicable'):
+        fv = fcf_dcf.get('fair_value_per_share', 0)
+        upside = fcf_dcf.get('upside_downside', 0)
+        rec = fcf_dcf.get('recommendation', 'N/A')
+        lines.append(f"FCF DCF | ₹{fv:.2f} | {upside:.1%} | {rec}")
+    
+    if fcfe_dcf and fcfe_dcf.get('applicable'):
+        fv = fcfe_dcf.get('fair_value_per_share', 0)
+        upside = fcfe_dcf.get('upside_downside', 0)
+        rec = fcfe_dcf.get('recommendation', 'N/A')
+        lines.append(f"FCFE DCF | ₹{fv:.2f} | {upside:.1%} | {rec}")
+    
+    lines.append(f"\nCurrent Market Price: ₹{current_price:.2f}")
+    
+    return "\n".join(lines)
 
 
 def identify_strengths_concerns(state: EquityResearchState) -> tuple[str, str]:
@@ -596,13 +700,22 @@ def write_report_node(state: EquityResearchState) -> Dict[str, Any]:
             ("human", VALUATION_ANALYSIS_PROMPT)
         ])
         
+        # Get DCF data
+        wacc_data = state.get('wacc', {})
+        fcf_dcf = state.get('dcf_fcf_valuation', {})
+        fcfe_dcf = state.get('dcf_fcfe_valuation', {})
+        
+        # Get current price for comparison
+        stock_prices = state.get('stock_prices')
+        current_price_val = stock_prices['Close'].iloc[-1] if stock_prices is not None and not stock_prices.empty else 0
+        
         valuation_vars = {
             **common_vars,
-            'current_dividend': ddm.get('d0_current_dividend', 'N/A') if ddm.get('applicable') else 'N/A',
-            'next_dividend': ddm.get('d1_next_dividend', 'N/A') if ddm.get('applicable') else 'N/A',
-            'growth_rate': ddm.get('growth_rate', 0) * 100 if ddm.get('applicable') else 'N/A',
-            'fair_value': ddm.get('fair_value', 'N/A') if ddm.get('applicable') else 'N/A',
-            'upside_downside': ddm.get('upside_downside', 0) * 100 if ddm.get('applicable') else 'N/A',
+            'wacc_data': format_wacc_data(wacc_data),
+            'ddm_data': format_ddm_data(ddm),
+            'fcf_dcf_data': format_dcf_data(fcf_dcf, "FCF DCF"),
+            'fcfe_dcf_data': format_dcf_data(fcfe_dcf, "FCFE DCF"),
+            'valuation_comparison': format_valuation_comparison(ddm, fcf_dcf, fcfe_dcf, current_price_val),
             'recommendation': state.get('valuation_recommendation', 'N/A'),
         }
         

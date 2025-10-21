@@ -98,6 +98,23 @@ class EquityResearchState(TypedDict, total=False):
                   'd1_next_dividend', 'growth_rate', 'cost_of_equity',
                   'current_price', 'upside_downside', 'recommendation'
         
+        wacc (Dict): Weighted Average Cost of Capital
+            Keys: 'wacc', 'weight_equity', 'weight_debt', 'cost_of_equity',
+                  'cost_of_debt', 'cost_of_debt_after_tax', 'tax_rate',
+                  'market_value_equity', 'market_value_debt'
+        
+        dcf_fcf_valuation (Dict): DCF valuation using Free Cash Flow to Firm
+            Keys: 'applicable', 'method', 'historical_fcf', 'fcf_growth_rate',
+                  'projected_fcf', 'terminal_value', 'wacc', 'enterprise_value',
+                  'net_debt', 'equity_value', 'fair_value_per_share',
+                  'upside_downside', 'recommendation'
+        
+        dcf_fcfe_valuation (Dict): DCF valuation using Free Cash Flow to Equity
+            Keys: 'applicable', 'method', 'historical_fcfe', 'fcfe_growth_rate',
+                  'projected_fcfe', 'terminal_value', 'cost_of_equity',
+                  'equity_value', 'fair_value_per_share', 'upside_downside',
+                  'recommendation'
+        
         market_risk_premium (Dict): Market risk analysis
             Keys: 'premium', 'annualized_return', 'volatility', 'sharpe_ratio'
         
@@ -188,6 +205,12 @@ class EquityResearchState(TypedDict, total=False):
     correlation_with_market: Optional[float]
     cost_of_equity: Optional[float]
     ddm_valuation: Optional[Dict[str, Any]]
+    
+    # === DCF VALUATION ===
+    wacc: Optional[Dict[str, Any]]  # Weighted Average Cost of Capital
+    dcf_fcf_valuation: Optional[Dict[str, Any]]  # FCF-based DCF valuation
+    dcf_fcfe_valuation: Optional[Dict[str, Any]]  # FCFE-based DCF valuation
+    
     market_risk_premium: Optional[Dict[str, float]]
     valuation_recommendation: Optional[str]
     

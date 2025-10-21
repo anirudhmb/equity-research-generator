@@ -33,6 +33,9 @@ from tools.market_tools import (
     calculate_capm_cost_of_equity,
     dividend_discount_model,
     calculate_market_risk_premium,
+    calculate_wacc,
+    dcf_valuation_fcf,
+    dcf_valuation_fcfe,
     comprehensive_valuation_analysis
 )
 
@@ -362,7 +365,173 @@ def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
         updates['ddm_valuation'] = None
         updates['valuation_recommendation'] = "N/A (valuation error)"
     
-    # ==================== 6. SUMMARY ====================
+    # ==================== 6. DCF VALUATIONS (FCF & FCFE) ====================
+    logger.info("\n💰 Step 6/7: Performing DCF Valuations...")
+    
+    # 6.1: Calculate WACC (for FCF-based DCF)
+    logger.info("   🔹 Step 6.1: Calculating WACC...")
+    try:
+        company_info = state.get('company_info', {})
+        market_cap = company_info.get('marketCap', 0)
+        
+        # Get debt from balance sheet
+        if balance_sheet is not None and not balance_sheet.empty:
+            debt_keys = ['Total Debt', 'Long Term Debt And Capital Lease Obligation']
+            total_debt = 0
+            for key in debt_keys:
+                if key in balance_sheet.index:
+                    total_debt = balance_sheet.loc[key].iloc[0]
+                    break
+            
+            # Estimate cost of debt (interest expense / total debt)
+            if income_statement is not None and not income_statement.empty:
+                interest_keys = ['Interest Expense', 'Interest Expense Non Operating']
+                interest_expense = 0
+                for key in interest_keys:
+                    if key in income_statement.index:
+                        interest_expense = abs(income_statement.loc[key].iloc[0])  # Usually negative
+                        break
+                
+                cost_of_debt = (interest_expense / total_debt) if total_debt > 0 else 0.08  # Default 8%
+                cost_of_debt = max(cost_of_debt, 0.05)  # Minimum 5%
+                cost_of_debt = min(cost_of_debt, 0.15)  # Maximum 15%
+            else:
+                cost_of_debt = 0.08  # Default 8% for Indian markets
+            
+            # Calculate WACC
+            if updates.get('cost_of_equity') and market_cap > 0:
+                wacc_result = calculate_wacc(
+                    cost_of_equity=updates['cost_of_equity'],
+                    cost_of_debt=cost_of_debt,
+                    market_value_equity=market_cap,
+                    market_value_debt=total_debt,
+                    tax_rate=0.25  # Indian corporate tax rate ~25%
+                )
+                updates['wacc'] = wacc_result
+                logger.success(f"✅ WACC: {wacc_result['wacc']:.2%}")
+                logger.info(f"   E/V: {wacc_result['weight_equity']:.1%}, D/V: {wacc_result['weight_debt']:.1%}")
+                logger.info(f"   Cost of Debt: {cost_of_debt:.2%}")
+            else:
+                updates['wacc'] = None
+                logger.warning("⚠️  Cannot calculate WACC (missing cost of equity or market cap)")
+        else:
+            updates['wacc'] = None
+            logger.warning("⚠️  Cannot calculate WACC (missing balance sheet)")
+    except Exception as e:
+        error_msg = f"WACC calculation error: {str(e)}"
+        updates['errors'].append(error_msg)
+        logger.error(f"❌ {error_msg}")
+        updates['wacc'] = None
+    
+    # 6.2: FCF-based DCF Valuation
+    logger.info("\n   🔹 Step 6.2: FCF-based DCF Valuation...")
+    try:
+        if (cash_flow is not None and not cash_flow.empty and 
+            income_statement is not None and not income_statement.empty and
+            balance_sheet is not None and not balance_sheet.empty and
+            updates.get('wacc') is not None):
+            
+            # Get shares outstanding
+            shares_outstanding = None
+            if income_statement is not None:
+                share_keys = ['Diluted Average Shares', 'Ordinary Shares Number']
+                for key in share_keys:
+                    if key in income_statement.index:
+                        shares_outstanding = income_statement.loc[key].iloc[0]
+                        break
+            
+            fcf_dcf = dcf_valuation_fcf(
+                cash_flow_df=cash_flow,
+                income_stmt=income_statement,
+                balance_sheet=balance_sheet,
+                wacc=updates['wacc']['wacc'],
+                terminal_growth_rate=0.03,  # 3% perpetual growth
+                forecast_years=5,
+                shares_outstanding=shares_outstanding,
+                current_price=current_price
+            )
+            updates['dcf_fcf_valuation'] = fcf_dcf
+            
+            if fcf_dcf.get('applicable', False):
+                logger.success(f"✅ FCF DCF Fair Value: ₹{fcf_dcf.get('fair_value_per_share', 0):.2f}")
+                logger.info(f"   FCF Growth Rate: {fcf_dcf.get('fcf_growth_rate', 0):.2%}")
+                logger.info(f"   Enterprise Value: ₹{fcf_dcf.get('enterprise_value', 0):,.0f} Cr")
+                if current_price:
+                    logger.info(f"   Upside/Downside: {fcf_dcf.get('upside_downside', 0):.1%}")
+            else:
+                warning_msg = f"FCF DCF not applicable: {fcf_dcf.get('reason', 'Unknown')}"
+                updates['warnings'].append(warning_msg)
+                logger.warning(f"⚠️  {warning_msg}")
+        else:
+            updates['dcf_fcf_valuation'] = {
+                'applicable': False,
+                'reason': 'Missing financial statements or WACC'
+            }
+            logger.warning("⚠️  FCF DCF not calculated (missing data)")
+    except Exception as e:
+        error_msg = f"FCF DCF valuation error: {str(e)}"
+        updates['errors'].append(error_msg)
+        logger.error(f"❌ {error_msg}")
+        updates['dcf_fcf_valuation'] = {
+            'applicable': False,
+            'reason': f'Calculation error: {str(e)}'
+        }
+    
+    # 6.3: FCFE-based DCF Valuation
+    logger.info("\n   🔹 Step 6.3: FCFE-based DCF Valuation...")
+    try:
+        if (cash_flow is not None and not cash_flow.empty and
+            income_statement is not None and not income_statement.empty and
+            balance_sheet is not None and not balance_sheet.empty and
+            updates.get('cost_of_equity') is not None):
+            
+            # Get shares outstanding
+            shares_outstanding = None
+            if income_statement is not None:
+                share_keys = ['Diluted Average Shares', 'Ordinary Shares Number']
+                for key in share_keys:
+                    if key in income_statement.index:
+                        shares_outstanding = income_statement.loc[key].iloc[0]
+                        break
+            
+            fcfe_dcf = dcf_valuation_fcfe(
+                cash_flow_df=cash_flow,
+                income_stmt=income_statement,
+                balance_sheet=balance_sheet,
+                cost_of_equity=updates['cost_of_equity'],
+                terminal_growth_rate=0.03,  # 3% perpetual growth
+                forecast_years=5,
+                shares_outstanding=shares_outstanding,
+                current_price=current_price
+            )
+            updates['dcf_fcfe_valuation'] = fcfe_dcf
+            
+            if fcfe_dcf.get('applicable', False):
+                logger.success(f"✅ FCFE DCF Fair Value: ₹{fcfe_dcf.get('fair_value_per_share', 0):.2f}")
+                logger.info(f"   FCFE Growth Rate: {fcfe_dcf.get('fcfe_growth_rate', 0):.2%}")
+                logger.info(f"   Equity Value: ₹{fcfe_dcf.get('equity_value', 0):,.0f} Cr")
+                if current_price:
+                    logger.info(f"   Upside/Downside: {fcfe_dcf.get('upside_downside', 0):.1%}")
+            else:
+                warning_msg = f"FCFE DCF not applicable: {fcfe_dcf.get('reason', 'Unknown')}"
+                updates['warnings'].append(warning_msg)
+                logger.warning(f"⚠️  {warning_msg}")
+        else:
+            updates['dcf_fcfe_valuation'] = {
+                'applicable': False,
+                'reason': 'Missing financial statements or cost of equity'
+            }
+            logger.warning("⚠️  FCFE DCF not calculated (missing data)")
+    except Exception as e:
+        error_msg = f"FCFE DCF valuation error: {str(e)}"
+        updates['errors'].append(error_msg)
+        logger.error(f"❌ {error_msg}")
+        updates['dcf_fcfe_valuation'] = {
+            'applicable': False,
+            'reason': f'Calculation error: {str(e)}'
+        }
+    
+    # ==================== 7. SUMMARY ====================
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
     
@@ -379,10 +548,20 @@ def analyze_node(state: EquityResearchState) -> Dict[str, Any]:
         logger.info(f"   Beta: {updates['beta']:.3f}")
     if updates.get('cost_of_equity') is not None:
         logger.info(f"   Cost of Equity: {updates['cost_of_equity']:.2%}")
+    if updates.get('wacc') is not None:
+        logger.info(f"   WACC: {updates['wacc']['wacc']:.2%}")
+    
+    # Valuation summary
+    logger.info(f"\n💎 Valuation Summary:")
     if updates.get('ddm_valuation') and updates['ddm_valuation'].get('applicable'):
-        logger.info(f"   Fair Value (DDM): ₹{updates['ddm_valuation']['fair_value']:.2f}")
+        logger.info(f"   DDM Fair Value: ₹{updates['ddm_valuation']['fair_value']:.2f}")
+    if updates.get('dcf_fcf_valuation') and updates['dcf_fcf_valuation'].get('applicable'):
+        logger.info(f"   FCF DCF Fair Value: ₹{updates['dcf_fcf_valuation'].get('fair_value_per_share', 0):.2f}")
+    if updates.get('dcf_fcfe_valuation') and updates['dcf_fcfe_valuation'].get('applicable'):
+        logger.info(f"   FCFE DCF Fair Value: ₹{updates['dcf_fcfe_valuation'].get('fair_value_per_share', 0):.2f}")
+    
     if updates.get('valuation_recommendation'):
-        logger.info(f"   Recommendation: {updates['valuation_recommendation']}")
+        logger.info(f"\n   Recommendation: {updates['valuation_recommendation']}")
     
     if updates['errors']:
         logger.warning(f"\n⚠️  New errors encountered:")

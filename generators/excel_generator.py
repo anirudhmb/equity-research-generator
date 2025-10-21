@@ -508,12 +508,153 @@ def _add_valuation_sheet(wb: Workbook, state: EquityResearchState):
         ws['A15'] = "DDM Not Applicable:"
         ws['B15'] = ddm.get('reason', 'Company does not pay dividends')
     
-    # Style labels
-    for row in range(4, 21):
-        ws.cell(row=row, column=1).font = Font(bold=True)
+    # WACC
+    ws['A22'] = "WEIGHTED AVERAGE COST OF CAPITAL (WACC)"
+    ws['A22'].font = Font(bold=True, size=12, color="366092")
     
-    ws.column_dimensions['A'].width = 30
+    wacc_data = state.get('wacc', {})
+    
+    if wacc_data:
+        ws['A23'] = "Cost of Equity:"
+        ws['B23'] = f"{wacc_data.get('cost_of_equity', 0):.2%}"
+        ws['A24'] = "Cost of Debt (After-Tax):"
+        ws['B24'] = f"{wacc_data.get('cost_of_debt_after_tax', 0):.2%}"
+        ws['A25'] = "Weight of Equity (E/V):"
+        ws['B25'] = f"{wacc_data.get('weight_equity', 0):.1%}"
+        ws['A26'] = "Weight of Debt (D/V):"
+        ws['B26'] = f"{wacc_data.get('weight_debt', 0):.1%}"
+        ws['A27'] = "WACC:"
+        ws['B27'] = f"{wacc_data.get('wacc', 0):.2%}"
+    else:
+        ws['A23'] = "WACC Not Calculated"
+        ws['B23'] = "Missing data"
+    
+    # FCF-based DCF
+    ws['A29'] = "DCF VALUATION - FREE CASH FLOW (FCF)"
+    ws['A29'].font = Font(bold=True, size=12, color="366092")
+    
+    fcf_dcf = state.get('dcf_fcf_valuation', {})
+    
+    if fcf_dcf and fcf_dcf.get('applicable'):
+        ws['A30'] = "Method:"
+        ws['B30'] = "FCF to Firm (values entire firm)"
+        ws['A31'] = "FCF Growth Rate:"
+        ws['B31'] = f"{fcf_dcf.get('fcf_growth_rate', 0):.2%}"
+        ws['A32'] = "Terminal Growth Rate:"
+        ws['B32'] = f"{fcf_dcf.get('terminal_growth_rate', 0):.2%}"
+        ws['A33'] = "WACC (Discount Rate):"
+        ws['B33'] = f"{fcf_dcf.get('wacc', 0):.2%}"
+        ws['A34'] = "Enterprise Value:"
+        ws['B34'] = f"₹{fcf_dcf.get('enterprise_value', 0):,.0f} Cr"
+        ws['A35'] = "Net Debt:"
+        ws['B35'] = f"₹{fcf_dcf.get('net_debt', 0):,.0f} Cr"
+        ws['A36'] = "Equity Value:"
+        ws['B36'] = f"₹{fcf_dcf.get('equity_value', 0):,.0f} Cr"
+        ws['A37'] = "Fair Value per Share:"
+        ws['B37'] = f"₹{fcf_dcf.get('fair_value_per_share', 0):.2f}"
+        
+        stock_prices = state.get('stock_prices')
+        if stock_prices is not None and not stock_prices.empty:
+            current_price = stock_prices['Close'].iloc[-1]
+            ws['A38'] = "Current Price:"
+            ws['B38'] = f"₹{current_price:.2f}"
+            ws['A39'] = "Upside/Downside:"
+            ws['B39'] = f"{fcf_dcf.get('upside_downside', 0):.1%}"
+            ws['A40'] = "Recommendation:"
+            ws['B40'] = fcf_dcf.get('recommendation', 'N/A')
+    else:
+        ws['A30'] = "FCF DCF Not Applicable:"
+        ws['B30'] = fcf_dcf.get('reason', 'Missing data')
+    
+    # FCFE-based DCF
+    ws['A42'] = "DCF VALUATION - FREE CASH FLOW TO EQUITY (FCFE)"
+    ws['A42'].font = Font(bold=True, size=12, color="366092")
+    
+    fcfe_dcf = state.get('dcf_fcfe_valuation', {})
+    
+    if fcfe_dcf and fcfe_dcf.get('applicable'):
+        ws['A43'] = "Method:"
+        ws['B43'] = "FCFE (values equity directly)"
+        ws['A44'] = "FCFE Growth Rate:"
+        ws['B44'] = f"{fcfe_dcf.get('fcfe_growth_rate', 0):.2%}"
+        ws['A45'] = "Terminal Growth Rate:"
+        ws['B45'] = f"{fcfe_dcf.get('terminal_growth_rate', 0):.2%}"
+        ws['A46'] = "Cost of Equity (Discount Rate):"
+        ws['B46'] = f"{fcfe_dcf.get('cost_of_equity', 0):.2%}"
+        ws['A47'] = "Equity Value:"
+        ws['B47'] = f"₹{fcfe_dcf.get('equity_value', 0):,.0f} Cr"
+        ws['A48'] = "Fair Value per Share:"
+        ws['B48'] = f"₹{fcfe_dcf.get('fair_value_per_share', 0):.2f}"
+        
+        stock_prices = state.get('stock_prices')
+        if stock_prices is not None and not stock_prices.empty:
+            current_price = stock_prices['Close'].iloc[-1]
+            ws['A49'] = "Current Price:"
+            ws['B49'] = f"₹{current_price:.2f}"
+            ws['A50'] = "Upside/Downside:"
+            ws['B50'] = f"{fcfe_dcf.get('upside_downside', 0):.1%}"
+            ws['A51'] = "Recommendation:"
+            ws['B51'] = fcfe_dcf.get('recommendation', 'N/A')
+    else:
+        ws['A43'] = "FCFE DCF Not Applicable:"
+        ws['B43'] = fcfe_dcf.get('reason', 'Missing data')
+    
+    # Valuation Comparison
+    ws['A53'] = "VALUATION COMPARISON"
+    ws['A53'].font = Font(bold=True, size=12, color="366092")
+    
+    stock_prices = state.get('stock_prices')
+    current_price = stock_prices['Close'].iloc[-1] if stock_prices is not None and not stock_prices.empty else 0
+    
+    ws['A54'] = "Method"
+    ws['B54'] = "Fair Value"
+    ws['C54'] = "Current Price"
+    ws['D54'] = "Upside/Downside"
+    ws['E54'] = "Recommendation"
+    
+    # Header formatting
+    for col in ['A', 'B', 'C', 'D', 'E']:
+        ws[f'{col}54'].font = Font(bold=True)
+        ws[f'{col}54'].fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+    
+    row = 55
+    
+    # DDM
+    if ddm and ddm.get('applicable'):
+        ws[f'A{row}'] = "DDM (Dividend Discount)"
+        ws[f'B{row}'] = f"₹{ddm.get('fair_value', 0):.2f}"
+        ws[f'C{row}'] = f"₹{current_price:.2f}"
+        ws[f'D{row}'] = f"{ddm.get('upside_downside', 0):.1%}"
+        ws[f'E{row}'] = ddm.get('recommendation', 'N/A')
+        row += 1
+    
+    # FCF DCF
+    if fcf_dcf and fcf_dcf.get('applicable'):
+        ws[f'A{row}'] = "DCF (FCF to Firm)"
+        ws[f'B{row}'] = f"₹{fcf_dcf.get('fair_value_per_share', 0):.2f}"
+        ws[f'C{row}'] = f"₹{current_price:.2f}"
+        ws[f'D{row}'] = f"{fcf_dcf.get('upside_downside', 0):.1%}"
+        ws[f'E{row}'] = fcf_dcf.get('recommendation', 'N/A')
+        row += 1
+    
+    # FCFE DCF
+    if fcfe_dcf and fcfe_dcf.get('applicable'):
+        ws[f'A{row}'] = "DCF (FCFE to Equity)"
+        ws[f'B{row}'] = f"₹{fcfe_dcf.get('fair_value_per_share', 0):.2f}"
+        ws[f'C{row}'] = f"₹{current_price:.2f}"
+        ws[f'D{row}'] = f"{fcfe_dcf.get('upside_downside', 0):.1%}"
+        ws[f'E{row}'] = fcfe_dcf.get('recommendation', 'N/A')
+        row += 1
+    
+    # Style all labels
+    for r in range(4, row):
+        ws.cell(row=r, column=1).font = Font(bold=True)
+    
+    ws.column_dimensions['A'].width = 35
     ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 20
+    ws.column_dimensions['D'].width = 18
+    ws.column_dimensions['E'].width = 20
 
 
 def _add_news_sheet(wb: Workbook, state: EquityResearchState):
