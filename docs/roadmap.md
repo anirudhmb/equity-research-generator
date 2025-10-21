@@ -2,9 +2,9 @@
 
 ## Project Timeline: Automated Equity Research Report Generator
 
-**Estimated Total Time:** 15-20 hours of development  
+**Estimated Total Time:** 17-23 hours of development  
 **Target Completion:** Before October 31, 2025  
-**Last Updated:** October 19, 2025
+**Last Updated:** October 21, 2025
 
 ---
 
@@ -22,8 +22,9 @@
 | **Phase 8: Document Generation** | ✅ Complete | 100% (3/3) | Word ✅, Excel ✅, Tested ✅ |
 | **Phase 9: UI Development** | 🔄 In Progress | 50% (1/2) | Streamlit ✅, Testing ⏳ |
 | **Phase 10: Final Testing** | ⏳ Pending | 0% | End-to-end QA |
+| **Phase 11: Cash Flow Analysis** | ⏳ Pending | 0% (0/5) | Assignment requirement |
 
-**Overall Progress: 95% (21/23 major steps completed)**
+**Overall Progress: 91% (21/28 major steps completed)**
 
 **Current Status:** 
 - ✅ All 3 LangGraph nodes implemented and integrated
@@ -37,10 +38,11 @@
 - ⏳ UI polish & advanced testing pending (optional)
 
 **Next Steps:** 
-1. Test UI with multiple companies (RELIANCE, TCS, INFY)
-2. Add LLM API key for AI-generated report text (optional)
-3. Final integration testing (optional)
-4. Performance optimization (optional)
+1. **PRIORITY:** Implement Phase 11 - Cash Flow Analysis (assignment requirement)
+2. Test UI with multiple companies (RELIANCE, TCS, INFY)
+3. Add LLM API key for AI-generated report text (optional)
+4. Final integration testing (optional)
+5. Performance optimization (optional)
 
 ---
 
@@ -1954,6 +1956,340 @@ streamlit run ui/app.py
 **Deliverables:**
 - Deployed application
 - User guide
+
+---
+
+## Phase 11: Cash Flow Analysis Enhancement (2-3 hours)
+
+**Status:** ⏳ Pending  
+**Priority:** HIGH - Assignment Requirement  
+**Target:** Complete cash flow analysis as specified in assignment
+
+### 📊 Context: Assignment Requirement
+
+The assignment explicitly requires:
+> *"Conduct ratio analysis using the latest five years' data, including financial statements and **cash flow analysis**."*
+
+**Current State:**
+- ✅ Cash flow statement collected (raw data from yfinance)
+- ✅ Cash flow data used for DCF calculations (FCF, FCFE)
+- ❌ **NO dedicated cash flow ratios** (Operating Cash Flow Ratio, FCF Margin, etc.)
+- ❌ **NO cash flow narrative analysis** (LLM-generated section for Word report)
+- ❌ **NO year-on-year cash flow trend analysis** (similar to financial ratios)
+
+**Gap Analysis:**
+When someone says "cash flow analysis", they typically expect:
+1. **Cash Flow Ratios** - Measuring liquidity, quality of earnings, and financial flexibility
+2. **Cash Flow Trends** - Year-over-year analysis of operating, investing, and financing activities
+3. **Narrative Analysis** - Discussion of cash generation ability, sustainability, and concerns
+4. **Comparison to Peers** - How the company's cash flow compares to industry norms
+
+### ✅ Step 11.1: Cash Flow Ratio Calculator
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
+
+**Ratios to Implement (8-10 ratios):**
+
+**Operating Cash Flow Ratios:**
+1. **Operating Cash Flow Ratio** = Operating Cash Flow / Current Liabilities
+   - Measures ability to pay short-term obligations from operations
+   - Better than current ratio (uses cash, not accruals)
+
+2. **Cash Flow to Sales Ratio** = Operating Cash Flow / Revenue
+   - Operating cash flow margin
+   - Shows quality of revenue (cash vs. accrual)
+
+3. **Cash Flow Return on Assets** = Operating Cash Flow / Total Assets
+   - Measures efficiency of cash generation from assets
+
+**Free Cash Flow Ratios:**
+4. **Free Cash Flow Margin** = Free Cash Flow / Revenue
+   - FCF as % of sales
+   - Key profitability metric
+
+5. **FCF to Operating Cash Flow Ratio** = FCF / Operating Cash Flow
+   - Shows % of OCF remaining after CapEx
+   - High ratio = less capital intensive
+
+**Quality of Earnings:**
+6. **Cash Flow to Net Income Ratio** = Operating Cash Flow / Net Income
+   - Quality of earnings check
+   - Should be close to 1.0; >1.0 is excellent, <0.7 is concerning
+
+7. **Accrual Ratio** = (Net Income - Operating Cash Flow) / Total Assets
+   - High accruals may indicate aggressive accounting
+   - Lower is better (less accrual-based earnings)
+
+**Financial Flexibility:**
+8. **Cash Flow Coverage Ratio** = Operating Cash Flow / Total Debt
+   - Ability to pay off debt from operations
+   - Higher is better
+
+9. **Dividend Coverage (Cash)** = Free Cash Flow / Dividends Paid
+   - Can the company sustain dividends from FCF?
+   - >1.5 is healthy
+
+10. **Capital Expenditure Coverage** = Operating Cash Flow / Capital Expenditure
+    - How many times can CapEx be covered by OCF?
+    - >2.0 is comfortable
+
+**Implementation Details:**
+- Add `CashFlowRatioCalculator` class to `tools/ratio_calculator.py` (or new file `tools/cashflow_calculator.py`)
+- Similar structure to existing `RatioCalculator`
+- Use existing cash flow statement data from state
+- Calculate year-on-year for all available periods (4 years from yfinance)
+- Add trend analysis (improving/deteriorating)
+
+**Deliverables:**
+- [ ] `tools/cashflow_calculator.py` with `CashFlowRatioCalculator` class
+- [ ] 8-10 cash flow ratios implemented
+- [ ] Year-on-year calculation support
+- [ ] Trend analysis (similar to financial ratios)
+- [ ] Unit tests for all ratios
+
+---
+
+### ✅ Step 11.2: Integrate Cash Flow Ratios into Workflow
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**State Schema Updates:**
+Add to `agents/state.py`:
+```python
+# In EquityResearchState TypedDict
+cashflow_ratios: Optional[Dict[str, Dict[str, List[float]]]]
+cashflow_ratios_by_year: Optional[List[Dict[str, Any]]]
+cashflow_trends: Optional[Dict[str, Dict[str, Any]]]
+```
+
+**Financial Analysis Node Updates:**
+Modify `agents/nodes/financial_analysis.py` to:
+1. Import `CashFlowRatioCalculator`
+2. Add new Step 4.5 (after regular ratios, before Beta):
+   ```python
+   # Step 4.5: Calculate cash flow ratios
+   calculator = CashFlowRatioCalculator(cash_flow, income_statement, balance_sheet)
+   cashflow_ratios_by_year = []
+   for period in range(num_periods):
+       period_ratios = calculator.calculate_all_ratios(period)
+       cashflow_ratios_by_year.append({...})
+   ```
+3. Update state with cash flow ratio results
+4. Update summary logging to include cash flow metrics
+
+**Deliverables:**
+- [ ] State schema updated with cash flow ratio fields
+- [ ] Financial analysis node updated to calculate cash flow ratios
+- [ ] Proper error handling and logging
+- [ ] Integration tested with sample company
+
+---
+
+### ✅ Step 11.3: Cash Flow Narrative Analysis (LLM)
+**Duration:** 45 minutes  
+**Status:** ⏳ Pending
+
+**Add New Report Section:**
+Create dedicated "Cash Flow Analysis" section in Word report (between Financial Analysis and Valuation Analysis).
+
+**LLM Prompt for Cash Flow Analysis:**
+```python
+CASHFLOW_ANALYSIS_PROMPT = """Write a comprehensive cash flow analysis section (3-4 paragraphs).
+
+Company: {company_name}
+
+YEAR-ON-YEAR OPERATING CASH FLOW RATIOS:
+{operating_cf_ratios_yoy}
+
+YEAR-ON-YEAR FREE CASH FLOW RATIOS:
+{free_cf_ratios_yoy}
+
+YEAR-ON-YEAR QUALITY OF EARNINGS RATIOS:
+{quality_ratios_yoy}
+
+YEAR-ON-YEAR FINANCIAL FLEXIBILITY RATIOS:
+{flexibility_ratios_yoy}
+
+RAW CASH FLOW DATA (for context):
+- Latest Operating Cash Flow: {latest_ocf}
+- Latest Free Cash Flow: {latest_fcf}
+- Latest Capital Expenditure: {latest_capex}
+- Operating CF 3-year trend: {ocf_trend}
+
+Analyze:
+1. **Operating Cash Flow Strength** - Assess the company's ability to generate cash from core operations
+   - Compare OCF to revenue and net income
+   - Identify trends (improving/deteriorating)
+   - Evaluate OCF sustainability
+
+2. **Free Cash Flow Generation** - Evaluate cash available after necessary investments
+   - FCF trends and margins
+   - Capital intensity (CapEx as % of OCF)
+   - Ability to fund growth, dividends, and debt repayment
+
+3. **Quality of Earnings** - Assess earnings quality using cash flow metrics
+   - Compare OCF to Net Income (should be close)
+   - Check accrual levels (high accruals = potential red flag)
+   - Identify any aggressive accounting concerns
+
+4. **Financial Flexibility** - Evaluate the company's financial cushion
+   - Ability to cover debt obligations from cash flow
+   - Dividend sustainability from FCF
+   - Capacity for future investments
+
+5. **Overall Cash Flow Health** - Provide a holistic assessment
+   - Compare to industry norms
+   - Highlight strengths and concerns
+   - Investment implications
+
+IMPORTANT: Focus on cash flow trends and what they mean for the business. Explain whether cash flow is strengthening or weakening over time."""
+```
+
+**Report Writing Node Updates:**
+Modify `agents/nodes/report_writing.py` to:
+1. Add `CASHFLOW_ANALYSIS_PROMPT` (new prompt)
+2. Add helper function `format_cashflow_ratios_by_year` (similar to `format_ratios_by_year`)
+3. Add new section generation step (Step 3.5: Cash Flow Analysis)
+4. Update state field: `cashflow_analysis_text`
+5. Update section order in summary
+
+**Word Generator Updates:**
+Modify `generators/word_generator.py` to:
+1. Add new section "4. Cash Flow Analysis" (after Financial Analysis, before Valuation)
+2. Update section numbering accordingly
+3. Apply professional formatting
+
+**State Schema Updates:**
+Add to `agents/state.py`:
+```python
+cashflow_analysis_text: Optional[str]  # In REPORT WRITING NODE OUTPUT section
+```
+
+**Deliverables:**
+- [ ] New LLM prompt for cash flow analysis
+- [ ] Helper functions for formatting cash flow data
+- [ ] Report writing node updated with new section
+- [ ] Word generator updated with new section
+- [ ] State schema updated
+- [ ] Tested with sample company
+
+---
+
+### ✅ Step 11.4: Enhanced Excel Cash Flow Sheet
+**Duration:** 45 minutes  
+**Status:** ⏳ Pending
+
+**Current Excel Cash Flow Sheet:**
+- Shows raw cash flow statement (Operating, Investing, Financing activities)
+- Minimal formatting
+- No ratios or analysis
+
+**Enhancements to Implement:**
+
+**1. Add Cash Flow Ratios Section:**
+- Similar to Financial Ratios sheet
+- Categories:
+  - Operating Cash Flow Ratios
+  - Free Cash Flow Ratios
+  - Quality of Earnings
+  - Financial Flexibility
+- Year-on-year comparison
+- Trend indicators (↑↓→)
+
+**2. Add Cash Flow Summary Section:**
+- Key metrics table:
+  - Operating Cash Flow (by year)
+  - Free Cash Flow (by year)
+  - Capital Expenditure (by year)
+  - FCF Margin (by year)
+  - OCF/Net Income Ratio (by year)
+
+**3. Add Cash Flow Charts:**
+- Line chart: Operating Cash Flow trend
+- Line chart: Free Cash Flow trend
+- Bar chart: Cash Flow breakdown (Operating, Investing, Financing)
+
+**4. Add Calculated Fields:**
+- Free Cash Flow = Operating CF - CapEx
+- FCF Margin = FCF / Revenue
+- OCF Margin = OCF / Revenue
+
+**Excel Generator Updates:**
+Modify `generators/excel_generator.py`:
+1. Update `_add_cashflow_sheet` method
+2. Add ratio table (similar to Financial Ratios sheet)
+3. Add summary metrics table
+4. Add Excel charts for visualization
+5. Improve formatting (professional styling)
+
+**Deliverables:**
+- [ ] Enhanced Excel Cash Flow sheet with ratios
+- [ ] Summary metrics table
+- [ ] Year-on-year comparison
+- [ ] Professional formatting and charts
+- [ ] Tested with sample company
+
+---
+
+### ✅ Step 11.5: Testing & Validation
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Test Cases:**
+1. **Cash Flow Positive Company** (e.g., TCS, RELIANCE)
+   - Verify all ratios calculate correctly
+   - Check LLM analysis makes sense
+   - Validate Excel formatting
+
+2. **Cash Flow Negative Company** (high CapEx, growth phase)
+   - Verify negative FCF handled correctly
+   - Check LLM explains the situation appropriately
+
+3. **No Dividend Company**
+   - Ensure dividend coverage ratio returns N/A gracefully
+
+**Validation Checklist:**
+- [ ] All cash flow ratios calculate correctly
+- [ ] Year-on-year trends show properly
+- [ ] LLM analysis is coherent and insightful
+- [ ] Excel sheet displays all data correctly
+- [ ] No errors or exceptions
+- [ ] Manual spot-check of 2-3 companies
+
+**Deliverables:**
+- [ ] All tests passing
+- [ ] Manual verification completed
+- [ ] Edge cases handled gracefully
+
+---
+
+### 📊 Phase 11 Summary
+
+**Total Duration:** 2-3 hours  
+**Impact:** HIGH - Completes assignment requirement for "cash flow analysis"
+
+**Files to Modify/Create:**
+1. `tools/cashflow_calculator.py` (NEW) - 8-10 cash flow ratios
+2. `agents/state.py` (MODIFY) - Add cash flow ratio fields
+3. `agents/nodes/financial_analysis.py` (MODIFY) - Integrate cash flow ratio calculation
+4. `agents/nodes/report_writing.py` (MODIFY) - Add LLM cash flow analysis section
+5. `generators/word_generator.py` (MODIFY) - Add cash flow section to report
+6. `generators/excel_generator.py` (MODIFY) - Enhance cash flow sheet
+7. `tests/test_cashflow.py` (NEW) - Unit tests for cash flow calculator
+
+**Expected Output:**
+- ✅ Word Report: New "Cash Flow Analysis" section (3-4 paragraphs, LLM-generated)
+- ✅ Excel Workbook: Enhanced Cash Flow sheet with ratios, trends, and charts
+- ✅ Complete cash flow analysis satisfying assignment requirement
+- ✅ Professional-grade analysis (not just raw data dump)
+
+**Success Criteria:**
+- [ ] 8-10 cash flow ratios implemented and calculating correctly
+- [ ] Year-on-year cash flow trends available
+- [ ] LLM-generated cash flow narrative (3-4 paragraphs)
+- [ ] Enhanced Excel cash flow sheet with ratios and charts
+- [ ] Assignment requirement fully satisfied
+- [ ] Tested with 3+ companies
 
 ---
 
