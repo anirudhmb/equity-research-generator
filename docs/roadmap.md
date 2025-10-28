@@ -2,9 +2,9 @@
 
 ## Project Timeline: Automated Equity Research Report Generator
 
-**Estimated Total Time:** 17-23 hours of development  
+**Estimated Total Time:** 20-26 hours of development  
 **Target Completion:** Before October 31, 2025  
-**Last Updated:** October 21, 2025
+**Last Updated:** October 28, 2025
 
 ---
 
@@ -23,8 +23,9 @@
 | **Phase 9: UI Development** | 🔄 In Progress | 50% (1/2) | Streamlit ✅, Testing ⏳ |
 | **Phase 10: Final Testing** | ⏳ Pending | 0% | End-to-end QA |
 | **Phase 11: Cash Flow Analysis** | ⏳ Pending | 0% (0/5) | Assignment requirement |
+| **Phase 12: Bloomberg Integration** | 🔄 Parser Done | 17% (1/6) | Parser ✅, Integration ⏳ |
 
-**Overall Progress: 91% (21/28 major steps completed)**
+**Overall Progress: 88% (21/34 major steps completed)**
 
 **Current Status:** 
 - ✅ All 3 LangGraph nodes implemented and integrated
@@ -33,16 +34,20 @@
 - ✅ Generated documents: 39 KB Word report, 28 KB Excel workbook (9 sheets)
 - ✅ Streamlit UI implemented with comprehensive features
 - ✅ UI validation tests passing (4/4 tests)
+- ✅ Bloomberg parser complete (5 sheets, tested with Tata Steel)
 - ✅ **READY FOR USE** - Core functionality complete!
+- ⏳ Bloomberg integration pending (workflow, UI, field mapping)
+- ⏳ Cash flow analysis pending (assignment requirement)
 - ⏳ LLM testing pending (needs API key for AI text generation)
 - ⏳ UI polish & advanced testing pending (optional)
 
 **Next Steps:** 
-1. **PRIORITY:** Implement Phase 11 - Cash Flow Analysis (assignment requirement)
-2. Test UI with multiple companies (RELIANCE, TCS, INFY)
-3. Add LLM API key for AI-generated report text (optional)
-4. Final integration testing (optional)
-5. Performance optimization (optional)
+1. **PRIORITY 1:** Implement Phase 11 - Cash Flow Analysis (assignment requirement - 2-3 hours)
+2. **PRIORITY 2:** Implement Phase 12 - Bloomberg Integration (data quality enhancement - 2.5-3 hours)
+3. Test UI with multiple companies (RELIANCE, TCS, INFY, TATASTEEL with Bloomberg)
+4. Add LLM API key for AI-generated report text (optional)
+5. Final integration testing (optional)
+6. Performance optimization (optional)
 
 ---
 
@@ -2290,6 +2295,608 @@ Modify `generators/excel_generator.py`:
 - [ ] Enhanced Excel cash flow sheet with ratios and charts
 - [ ] Assignment requirement fully satisfied
 - [ ] Tested with 3+ companies
+
+---
+
+## Phase 12: Bloomberg Terminal Data Integration (2.5-3 hours)
+
+**Status:** 🔄 Parser Complete, Integration Pending  
+**Priority:** MEDIUM - Data Quality Enhancement  
+**Target:** Enable Bloomberg Terminal data as primary source for enhanced accuracy
+
+### 📊 Context: Why Bloomberg Integration?
+
+**Bloomberg Terminal Advantages:**
+- 📈 **10 years** of historical data (vs. 4 years from yfinance)
+- ✅ **Professional-grade** adjustments and standardization
+- 🎯 **97 balance sheet fields** (vs. 30-50 from yfinance)
+- 📊 **Pre-calculated ratios** (P/E, EV/EBITDA, Dividend Payout, etc.)
+- 🔮 **Forward estimates** (analyst projections for future years)
+- ⚡ **Real-time** data when exported (vs. quarterly lag in free sources)
+- 💹 **Monthly stock prices** with proper adjustments
+
+**Current Implementation Status:**
+- ✅ Bloomberg parser module complete (`tools/bloomberg_parser.py`)
+- ✅ Can parse all 5 sheets: Income Statement, Balance Sheet, Cash Flow, Stock Prices, Financial Metrics
+- ✅ Tested with real Bloomberg file (Tata Steel Ltd)
+- ✅ Documentation complete (`docs/BLOOMBERG_DATA_INTEGRATION.md`)
+- ❌ **NOT integrated** into main workflow yet
+- ❌ **NOT connected** to data collection node
+- ❌ **NO field mapping** (Bloomberg → yfinance schema)
+- ❌ **NO UI support** for file upload
+
+---
+
+### ✅ Step 12.1: State Schema Updates
+**Duration:** 15 minutes  
+**Status:** ⏳ Pending
+
+**Add to `agents/state.py`:**
+
+```python
+# ==================== DATA SOURCE TRACKING ====================
+data_source: Literal['yfinance', 'bloomberg', 'hybrid']
+"""Data source used for this report: yfinance (free), bloomberg (terminal export), or hybrid (both)"""
+
+bloomberg_file_path: Optional[str]
+"""Path to Bloomberg Excel file if used"""
+
+bloomberg_raw_data: Optional[Dict[str, pd.DataFrame]]
+"""Raw parsed Bloomberg data:
+- income_statement: DataFrame (75 fields × 10 periods)
+- balance_sheet: DataFrame (97 fields × 10 periods)  
+- cash_flow: DataFrame (56 fields × 10 periods)
+- stock_prices: DataFrame (time series, Date index, Close column)
+- financial_metrics: DataFrame (pre-calculated ratios)
+"""
+
+data_source_metadata: Optional[Dict[str, Any]]
+"""Metadata about data sources:
+- bloomberg_periods: int (number of historical periods from Bloomberg)
+- yfinance_periods: int (number of periods from yfinance)
+- hybrid_mode: bool (using both sources)
+- primary_source: str (which source takes precedence)
+- fallback_fields: List[str] (fields that fell back to yfinance)
+"""
+```
+
+**Deliverables:**
+- [ ] Add 4 new fields to `EquityResearchState` TypedDict
+- [ ] Add comprehensive documentation for each field
+- [ ] Update state schema diagram (if exists)
+
+---
+
+### ✅ Step 12.2: Bloomberg Field Mapper
+**Duration:** 1 hour  
+**Status:** ⏳ Pending
+
+**Create `tools/bloomberg_mapper.py`:**
+
+**Purpose:** Map Bloomberg field names → yfinance-compatible field names
+
+**Bloomberg → yfinance Field Mapping Examples:**
+
+```python
+# Income Statement Mappings
+INCOME_STATEMENT_MAP = {
+    # Bloomberg Field → yfinance Field
+    'Revenue': 'Total Revenue',
+    'Cost of Goods Sold': 'Cost Of Revenue',
+    'Gross Profit': 'Gross Profit',
+    'Operating Income': 'Operating Income',
+    'EBIT': 'EBIT',
+    'EBITDA': 'EBITDA',
+    'Pretax Income': 'Pretax Income',
+    'Net Income': 'Net Income',
+    'Diluted EPS': 'Diluted EPS',
+    # ... more mappings
+}
+
+# Balance Sheet Mappings
+BALANCE_SHEET_MAP = {
+    'Total Assets': 'Total Assets',
+    'Cash & Cash Equivalents': 'Cash And Cash Equivalents',
+    'Accounts & Notes Receiv': 'Accounts Receivable',
+    'Inventories': 'Inventory',
+    'Total Current Assets': 'Current Assets',
+    'PP&E': 'Net PPE',
+    'Total Liabilities': 'Total Liabilities Net Minority Interest',
+    'Current Liabilities': 'Current Liabilities',
+    'Total Debt': 'Total Debt',
+    'Total Equity': 'Stockholders Equity',
+    # ... more mappings
+}
+
+# Cash Flow Mappings
+CASHFLOW_MAP = {
+    'Cash from Operating Activities': 'Operating Cash Flow',
+    'Cash from Investing Activities': 'Investing Cash Flow',
+    'Cash from Financing Activities': 'Financing Cash Flow',
+    'Capital Expenditure': 'Capital Expenditure',
+    'Free Cash Flow': 'Free Cash Flow',
+    # ... more mappings
+}
+```
+
+**Key Functions:**
+
+```python
+def map_bloomberg_to_yfinance(
+    bloomberg_df: pd.DataFrame,
+    statement_type: Literal['income', 'balance', 'cashflow']
+) -> pd.DataFrame:
+    """
+    Map Bloomberg field names to yfinance-compatible names.
+    
+    Args:
+        bloomberg_df: Raw DataFrame from Bloomberg parser
+        statement_type: Type of financial statement
+    
+    Returns:
+        DataFrame with yfinance-compatible field names (index)
+    """
+    pass
+
+def merge_bloomberg_yfinance(
+    bloomberg_df: pd.DataFrame,
+    yfinance_df: pd.DataFrame,
+    primary: Literal['bloomberg', 'yfinance'] = 'bloomberg'
+) -> Tuple[pd.DataFrame, List[str]]:
+    """
+    Merge Bloomberg and yfinance data, with primary source taking precedence.
+    
+    Args:
+        bloomberg_df: Mapped Bloomberg DataFrame
+        yfinance_df: Original yfinance DataFrame
+        primary: Which source takes precedence for overlapping fields
+    
+    Returns:
+        (merged_df, fallback_fields) - Merged DataFrame and list of fields that used fallback
+    """
+    pass
+
+def validate_field_mapping(
+    bloomberg_df: pd.DataFrame,
+    expected_fields: List[str]
+) -> Tuple[bool, List[str], List[str]]:
+    """
+    Validate that critical fields are present after mapping.
+    
+    Returns:
+        (is_valid, missing_fields, extra_fields)
+    """
+    pass
+```
+
+**Implementation Details:**
+- Start with **60-80 core field mappings** (most commonly used in ratio calculations)
+- Unmapped Bloomberg fields → keep with original names (may be useful)
+- Log unmapped fields for future enhancement
+- Handle cases where Bloomberg has richer granularity (e.g., multiple revenue types)
+- Add fuzzy matching for similar field names
+
+**Deliverables:**
+- [ ] `tools/bloomberg_mapper.py` with `BloombergFieldMapper` class
+- [ ] 60-80 field mappings for Income Statement, Balance Sheet, Cash Flow
+- [ ] `map_bloomberg_to_yfinance()` function
+- [ ] `merge_bloomberg_yfinance()` function for hybrid mode
+- [ ] `validate_field_mapping()` function
+- [ ] Unit tests with sample Bloomberg and yfinance DataFrames
+- [ ] Documentation of mapping decisions
+
+---
+
+### ✅ Step 12.3: Data Collection Node Integration
+**Duration:** 45 minutes  
+**Status:** ⏳ Pending
+
+**Modify `agents/nodes/data_collection.py`:**
+
+**New Logic Flow:**
+
+```python
+def collect_data_node(state: EquityResearchState) -> Dict[str, Any]:
+    """Enhanced with Bloomberg support."""
+    
+    ticker = state['ticker']
+    updates = {...}
+    
+    # ==================== STEP 0: Check for Bloomberg File ====================
+    logger.info("🔍 Step 0: Checking for Bloomberg Terminal data...")
+    
+    bloomberg_file = None
+    
+    # Priority 1: Check if file path provided in state
+    if state.get('bloomberg_file_path'):
+        bloomberg_file = state['bloomberg_file_path']
+        logger.info(f"   Using provided Bloomberg file: {bloomberg_file}")
+    
+    # Priority 2: Auto-detect in data/bloomberg/ directory
+    else:
+        from tools.bloomberg_parser import detect_bloomberg_file
+        bloomberg_file = detect_bloomberg_file('data/bloomberg/', ticker)
+        if bloomberg_file:
+            logger.info(f"   Auto-detected Bloomberg file: {bloomberg_file}")
+    
+    # Priority 3: Check Downloads folder
+    if not bloomberg_file:
+        bloomberg_file = detect_bloomberg_file('~/Downloads/', ticker)
+        if bloomberg_file:
+            logger.info(f"   Found Bloomberg file in Downloads: {bloomberg_file}")
+    
+    # ==================== BLOOMBERG DATA PARSING ====================
+    if bloomberg_file:
+        try:
+            from tools.bloomberg_parser import parse_bloomberg_file
+            from tools.bloomberg_mapper import map_bloomberg_to_yfinance
+            
+            logger.info(f"📊 Parsing Bloomberg file...")
+            bloomberg_data = parse_bloomberg_file(bloomberg_file)
+            
+            # Extract and map financial statements
+            mapped_statements = {}
+            for stmt_type in ['income_statement', 'balance_sheet', 'cash_flow']:
+                if stmt_type in bloomberg_data['data']:
+                    mapped_df = map_bloomberg_to_yfinance(
+                        bloomberg_data['data'][stmt_type],
+                        stmt_type.split('_')[0]  # 'income', 'balance', 'cashflow'
+                    )
+                    mapped_statements[stmt_type] = mapped_df
+            
+            updates['financial_statements'] = mapped_statements
+            updates['data_source'] = 'bloomberg'
+            updates['bloomberg_file_path'] = bloomberg_file
+            updates['bloomberg_raw_data'] = bloomberg_data['data']
+            
+            # Use Bloomberg stock prices if available
+            if 'stock_prices' in bloomberg_data['data']:
+                updates['stock_prices'] = bloomberg_data['data']['stock_prices']
+                logger.success("✅ Using Bloomberg stock prices")
+            else:
+                # Fallback to yfinance for prices
+                updates['stock_prices'] = fetch_stock_prices(ticker, exchange="NSE")
+                updates['data_source'] = 'hybrid'
+                logger.info("   Fallback: Using yfinance for stock prices")
+            
+            # Get company info from yfinance (Bloomberg doesn't have this)
+            updates['company_info'] = fetch_company_info(ticker, exchange="NSE")
+            updates['data_source'] = 'hybrid'
+            
+            logger.success(f"✅ Bloomberg data loaded: {len(mapped_statements)} statements")
+            
+        except Exception as e:
+            logger.error(f"❌ Bloomberg parsing failed: {e}")
+            logger.info("   Falling back to yfinance...")
+            bloomberg_file = None  # Fall through to yfinance
+    
+    # ==================== YFINANCE FALLBACK ====================
+    if not bloomberg_file:
+        logger.info("📊 Using yfinance data source...")
+        # Original yfinance logic (current implementation)
+        financial_data = fetch_all_company_data(ticker, exchange="NSE", years=6)
+        updates['financial_statements'] = {...}
+        updates['data_source'] = 'yfinance'
+        # ... rest of current logic ...
+    
+    # ==================== DATA SOURCE METADATA ====================
+    updates['data_source_metadata'] = {
+        'primary_source': updates['data_source'],
+        'bloomberg_periods': len(updates['financial_statements']['income_statement'].columns) if updates['data_source'] in ['bloomberg', 'hybrid'] else 0,
+        'yfinance_periods': len(updates['financial_statements']['income_statement'].columns) if updates['data_source'] == 'yfinance' else 0,
+        'hybrid_mode': updates['data_source'] == 'hybrid',
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    return updates
+```
+
+**Deliverables:**
+- [ ] Modify `collect_data_node()` in `agents/nodes/data_collection.py`
+- [ ] Add Bloomberg file detection (3 priorities: provided path, data/bloomberg/, Downloads)
+- [ ] Add Bloomberg parsing and field mapping
+- [ ] Add fallback logic to yfinance
+- [ ] Track data source in state
+- [ ] Proper error handling and logging
+- [ ] Test with both Bloomberg and yfinance data sources
+
+---
+
+### ✅ Step 12.4: UI Enhancements
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Modify `run_ui.py`:**
+
+**Add File Upload Widget:**
+
+```python
+# In the sidebar, after ticker input
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📊 Data Source")
+
+data_source_option = st.sidebar.radio(
+    "Choose data source:",
+    options=["Auto-detect", "yfinance (Free)", "Bloomberg Terminal (Upload)"],
+    index=0,
+    help="Auto-detect will check for Bloomberg files first, then fallback to yfinance"
+)
+
+bloomberg_file_path = None
+
+if data_source_option == "Bloomberg Terminal (Upload)":
+    uploaded_file = st.sidebar.file_uploader(
+        "Upload Bloomberg Excel Export",
+        type=['xlsx', 'xls'],
+        help="Export from Bloomberg Terminal: FS, DVD, PRICE (all sheets)"
+    )
+    
+    if uploaded_file:
+        # Save uploaded file to temp location
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
+            tmp_file.write(uploaded_file.getvalue())
+            bloomberg_file_path = tmp_file.name
+        
+        st.sidebar.success(f"✅ Bloomberg file uploaded: {uploaded_file.name}")
+
+elif data_source_option == "Auto-detect":
+    # Check if Bloomberg files exist
+    from tools.bloomberg_parser import detect_bloomberg_file
+    detected_file = detect_bloomberg_file('data/bloomberg/', ticker) or \
+                    detect_bloomberg_file('~/Downloads/', ticker)
+    
+    if detected_file:
+        st.sidebar.info(f"🔍 Found Bloomberg file: {Path(detected_file).name}")
+        bloomberg_file_path = detected_file
+    else:
+        st.sidebar.info("🔍 No Bloomberg file found, will use yfinance")
+
+# Pass bloomberg_file_path to workflow
+initial_state = {
+    'ticker': ticker,
+    'company_name': company_name or ticker,
+    'bloomberg_file_path': bloomberg_file_path
+}
+```
+
+**Add Data Source Badge in Results:**
+
+```python
+# After report generation, show data source
+if 'data_source' in result:
+    source = result['data_source']
+    if source == 'bloomberg':
+        st.success("📊 Data Source: Bloomberg Terminal (10 years of data)")
+    elif source == 'hybrid':
+        st.info("📊 Data Source: Hybrid (Bloomberg + yfinance)")
+    else:
+        st.info("📊 Data Source: yfinance (Free)")
+    
+    # Show metadata
+    if 'data_source_metadata' in result:
+        metadata = result['data_source_metadata']
+        with st.expander("🔍 Data Source Details"):
+            st.json(metadata)
+```
+
+**Deliverables:**
+- [ ] Add file upload widget in sidebar
+- [ ] Add data source selection radio buttons
+- [ ] Add auto-detection logic with visual feedback
+- [ ] Pass `bloomberg_file_path` to workflow
+- [ ] Display data source badge in results
+- [ ] Add data source metadata expander
+- [ ] Handle file cleanup (temp files)
+
+---
+
+### ✅ Step 12.5: Report Generation Updates
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Update Report Writing Node:**
+
+**Modify `agents/nodes/report_writing.py`:**
+
+```python
+# In company_overview_prompt, add data source context
+COMPANY_OVERVIEW_PROMPT = """...
+
+DATA SOURCE:
+{data_source_context}
+
+...
+"""
+
+def format_data_source_context(state: EquityResearchState) -> str:
+    """Format data source information for LLM context."""
+    source = state.get('data_source', 'yfinance')
+    metadata = state.get('data_source_metadata', {})
+    
+    if source == 'bloomberg':
+        periods = metadata.get('bloomberg_periods', 0)
+        return f"Analysis based on Bloomberg Terminal data ({periods} years of historical data). Professional-grade financial data with comprehensive field coverage."
+    elif source == 'hybrid':
+        return f"Analysis based on hybrid data: Bloomberg Terminal for financial statements, yfinance for real-time pricing and company information."
+    else:
+        periods = metadata.get('yfinance_periods', 0)
+        return f"Analysis based on publicly available financial data from yfinance ({periods} years of historical data)."
+```
+
+**Update Word Generator:**
+
+**Modify `generators/word_generator.py`:**
+
+```python
+def _add_appendix(self, doc, state):
+    """Add appendix with data sources and disclaimers."""
+    # ... existing code ...
+    
+    # Add data source disclosure
+    doc.add_heading("Data Sources", level=2)
+    
+    source = state.get('data_source', 'yfinance')
+    metadata = state.get('data_source_metadata', {})
+    
+    if source == 'bloomberg':
+        doc.add_paragraph(
+            f"Financial data sourced from Bloomberg Terminal. "
+            f"Historical data: {metadata.get('bloomberg_periods', 0)} years. "
+            f"Data extraction date: {metadata.get('timestamp', 'N/A')}."
+        )
+    elif source == 'hybrid':
+        doc.add_paragraph(
+            "This report uses a hybrid data approach: Bloomberg Terminal for comprehensive "
+            "financial statement data, supplemented with yfinance for real-time market data "
+            "and company information."
+        )
+    else:
+        doc.add_paragraph(
+            f"Financial data sourced from Yahoo Finance (yfinance). "
+            f"Historical data: {metadata.get('yfinance_periods', 0)} years."
+        )
+```
+
+**Update Excel Generator:**
+
+**Modify `generators/excel_generator.py`:**
+
+```python
+def _add_summary_sheet(self, wb, state):
+    """Add summary sheet with data source information."""
+    ws = wb.create_sheet('Summary', 0)
+    
+    # ... existing summary content ...
+    
+    # Add data source section
+    row = 15  # After other summary info
+    ws[f'A{row}'] = 'Data Source:'
+    ws[f'A{row}'].font = Font(bold=True)
+    
+    source = state.get('data_source', 'yfinance')
+    metadata = state.get('data_source_metadata', {})
+    
+    if source == 'bloomberg':
+        ws[f'B{row}'] = f"Bloomberg Terminal ({metadata.get('bloomberg_periods', 0)} years)"
+        ws[f'B{row}'].fill = PatternFill(start_color='90EE90', fill_type='solid')  # Light green
+    elif source == 'hybrid':
+        ws[f'B{row}'] = "Hybrid (Bloomberg + yfinance)"
+        ws[f'B{row}'].fill = PatternFill(start_color='ADD8E6', fill_type='solid')  # Light blue
+    else:
+        ws[f'B{row}'] = f"yfinance ({metadata.get('yfinance_periods', 0)} years)"
+```
+
+**Deliverables:**
+- [ ] Add data source context to LLM prompts
+- [ ] Update Word report appendix with data source disclosure
+- [ ] Update Excel summary sheet with data source badge
+- [ ] Add data source metadata to both reports
+- [ ] Professional formatting for data source information
+
+---
+
+### ✅ Step 12.6: Testing & Validation
+**Duration:** 30 minutes  
+**Status:** ⏳ Pending
+
+**Test Scenarios:**
+
+**1. Bloomberg-Only Mode:**
+- [ ] Use Tata Steel Ltd Bloomberg file
+- [ ] Verify all 10 years of data loaded
+- [ ] Check ratio calculations (compare to pre-calculated Bloomberg ratios)
+- [ ] Validate DCF uses correct historical data
+- [ ] Confirm Word report mentions Bloomberg source
+- [ ] Confirm Excel shows Bloomberg badge
+
+**2. yfinance-Only Mode:**
+- [ ] Generate report for company without Bloomberg file
+- [ ] Verify graceful fallback
+- [ ] Check that all existing functionality still works
+- [ ] Confirm 4-5 years of data loaded
+
+**3. Hybrid Mode:**
+- [ ] Bloomberg file with missing stock prices
+- [ ] Verify fallback to yfinance for prices
+- [ ] Confirm hybrid badge displayed
+- [ ] Check metadata shows both sources
+
+**4. Error Handling:**
+- [ ] Upload corrupted Bloomberg file
+- [ ] Upload non-Bloomberg Excel file
+- [ ] Verify graceful error messages
+- [ ] Confirm fallback to yfinance works
+
+**5. Field Mapping Validation:**
+- [ ] Compare ratios: Bloomberg data vs. yfinance data
+- [ ] Spot-check 5-10 key fields (Revenue, Net Income, Total Assets, etc.)
+- [ ] Verify no critical fields missing after mapping
+
+**Validation Checklist:**
+- [ ] Bloomberg parser integrates successfully
+- [ ] Field mapping works correctly
+- [ ] No errors with Bloomberg data
+- [ ] No errors with yfinance fallback
+- [ ] Data source tracked properly in state
+- [ ] UI shows correct data source badge
+- [ ] Reports include data source disclosure
+- [ ] Manual validation with 2-3 companies
+
+**Deliverables:**
+- [ ] All test scenarios passing
+- [ ] Field mapping validated (spot-check)
+- [ ] Edge cases handled gracefully
+- [ ] Documentation updated with test results
+
+---
+
+### 📊 Phase 12 Summary
+
+**Total Duration:** 2.5-3 hours  
+**Impact:** MEDIUM-HIGH - Significantly improves data quality and historical depth
+
+**Files to Modify/Create:**
+1. `agents/state.py` (MODIFY) - Add 4 new fields for Bloomberg tracking
+2. `tools/bloomberg_mapper.py` (NEW) - Field mapping (Bloomberg → yfinance schema)
+3. `agents/nodes/data_collection.py` (MODIFY) - Bloomberg integration with fallback
+4. `run_ui.py` (MODIFY) - File upload widget and auto-detection
+5. `agents/nodes/report_writing.py` (MODIFY) - Data source context for LLM
+6. `generators/word_generator.py` (MODIFY) - Data source disclosure in appendix
+7. `generators/excel_generator.py` (MODIFY) - Data source badge in summary
+8. `tests/test_bloomberg_integration.py` (NEW) - Integration tests
+9. `data/bloomberg/` (NEW DIRECTORY) - For storing Bloomberg files
+
+**Expected Output:**
+- ✅ Bloomberg Terminal data support (10 years vs. 4 years)
+- ✅ Automatic fallback to yfinance (zero disruption to existing workflow)
+- ✅ Hybrid mode (Bloomberg + yfinance)
+- ✅ UI file upload for Bloomberg Excel exports
+- ✅ Data source tracking and disclosure in reports
+- ✅ Professional data source badges (Word + Excel)
+- ✅ 60-80 field mappings (Bloomberg → yfinance schema)
+
+**Success Criteria:**
+- [ ] Bloomberg data loads and maps correctly
+- [ ] All existing functionality works with Bloomberg data
+- [ ] yfinance fallback works seamlessly
+- [ ] UI supports file upload and auto-detection
+- [ ] Reports disclose data source professionally
+- [ ] Field mapping covers 80%+ of critical fields
+- [ ] Tested with 3+ companies (Bloomberg + yfinance)
+
+**Benefits:**
+- 📈 **2.5x more historical data** (10 years vs. 4 years)
+- ✅ **Professional-grade data** (Bloomberg adjustments)
+- 🎯 **Richer analysis** (more fields, pre-calculated ratios)
+- 🔮 **Forward estimates** (analyst projections available)
+- 💼 **Assignment credibility** (Bloomberg Terminal usage demonstrates access to professional tools)
+
+**Next Steps After Phase 12:**
+- Optional: Add Bloomberg dividend data parsing
+- Optional: Use Bloomberg's pre-calculated ratios for validation
+- Optional: Integrate forward estimates into valuation models
+- Optional: Add Bloomberg company profiles (sector, industry, description)
 
 ---
 
