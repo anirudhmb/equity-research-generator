@@ -68,6 +68,23 @@ class EquityResearchState(TypedDict, total=False):
         data_quality_score (float): Data completeness score 0.0-1.0
             0.8+ = Excellent, 0.6-0.8 = Good, <0.6 = Fair
         
+        === DATA SOURCE TRACKING ===
+        data_source (str): Data source used: 'yfinance', 'bloomberg', or 'hybrid'
+            'yfinance' = Free data (4-5 years)
+            'bloomberg' = Bloomberg Terminal (10 years, professional-grade)
+            'hybrid' = Bloomberg + yfinance (best of both)
+        
+        bloomberg_file_path (str): Path to Bloomberg Excel file if used
+            Example: '~/Downloads/Tata Steel Ltd-FS,DVD,Price.xlsx'
+        
+        bloomberg_raw_data (Dict[str, DataFrame]): Raw Bloomberg data
+            Keys: 'income_statement', 'balance_sheet', 'cash_flow', 
+                  'stock_prices', 'financial_metrics'
+        
+        data_source_metadata (Dict): Data source quality metadata
+            Keys: 'primary_source', 'bloomberg_periods', 'yfinance_periods',
+                  'hybrid_mode', 'fallback_fields', 'timestamp'
+        
         === FINANCIAL ANALYSIS NODE OUTPUT ===
         ratios (Dict): Financial ratios by category
             Structure: {
@@ -197,6 +214,72 @@ class EquityResearchState(TypedDict, total=False):
     news_timeline: Optional[Dict[str, Any]]
     data_quality_score: Optional[float]
     
+    # === DATA SOURCE TRACKING (Bloomberg Integration) ===
+    data_source: Optional[str]
+    """Data source used for financial statements: 'yfinance', 'bloomberg', or 'hybrid'.
+    
+    Values:
+        - 'yfinance': Free data from Yahoo Finance (4-5 years history)
+        - 'bloomberg': Bloomberg Terminal export (10 years history, professional-grade)
+        - 'hybrid': Bloomberg for statements + yfinance for real-time data
+    
+    This field enables transparency in data sourcing and helps users understand
+    the depth and quality of the analysis.
+    """
+    
+    bloomberg_file_path: Optional[str]
+    """Path to Bloomberg Excel file if used.
+    
+    Example: '~/Downloads/Tata Steel Ltd-FS,DVD,Price.xlsx'
+    
+    This is set when:
+    1. User uploads Bloomberg file via UI
+    2. Auto-detected in data/bloomberg/ directory
+    3. Found in ~/Downloads/ directory
+    
+    Used for logging, debugging, and data source disclosure in reports.
+    """
+    
+    bloomberg_raw_data: Optional[Dict[str, pd.DataFrame]]
+    """Raw parsed Bloomberg data before field mapping.
+    
+    Structure:
+        {
+            'income_statement': DataFrame (75 fields × 10 periods),
+            'balance_sheet': DataFrame (97 fields × 10 periods),
+            'cash_flow': DataFrame (56 fields × 10 periods),
+            'stock_prices': DataFrame (time series, Date index, Close column),
+            'financial_metrics': DataFrame (pre-calculated ratios: P/E, EV/EBITDA, etc.)
+        }
+    
+    This preserves the original Bloomberg data for:
+    - Validation against mapped data
+    - Access to Bloomberg-specific fields not in yfinance
+    - Use of pre-calculated ratios for cross-validation
+    - Forward estimates (analyst projections)
+    """
+    
+    data_source_metadata: Optional[Dict[str, Any]]
+    """Metadata about data sources and quality.
+    
+    Structure:
+        {
+            'primary_source': str ('bloomberg', 'yfinance', 'hybrid'),
+            'bloomberg_periods': int (number of historical periods from Bloomberg),
+            'yfinance_periods': int (number of periods from yfinance),
+            'hybrid_mode': bool (using both sources),
+            'fallback_fields': List[str] (fields that fell back to yfinance),
+            'timestamp': str (ISO format, when data was collected),
+            'bloomberg_file_name': str (original filename if Bloomberg used),
+            'data_collection_duration': float (seconds)
+        }
+    
+    This metadata is included in:
+    - Report appendix (data source disclosure)
+    - Excel summary sheet (data source badge)
+    - LLM context (for appropriate analysis framing)
+    """
+    
     # === FINANCIAL ANALYSIS NODE OUTPUT ===
     ratios: Optional[Dict[str, Dict[str, List[float]]]]
     ratios_by_year: Optional[List[Dict[str, Any]]]  # Year-on-year ratio comparison
@@ -268,6 +351,11 @@ def create_initial_state(ticker: str, company_name: Optional[str] = None) -> Equ
         news_categorized=None,
         news_timeline=None,
         data_quality_score=None,
+        # Bloomberg data source tracking
+        data_source=None,
+        bloomberg_file_path=None,
+        bloomberg_raw_data=None,
+        data_source_metadata=None,
         ratios=None,
         ratios_by_year=None,
         ratio_trends=None,
